@@ -1,0 +1,172 @@
+services:
+
+  # ── Infrastructure ───────────────────────────────────────────────────────────
+
+  postgres:
+    image: postgres:17
+    container_name: stable-roomies-postgres
+    environment:
+      POSTGRES_DB: stable_roomies
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    container_name: stable-roomies-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    container_name: stable-roomies-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"   # Management UI → http://localhost:15672
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+  # ── Backend Services ─────────────────────────────────────────────────────────
+
+  student-service:
+    build:
+      context: ../../backend/student-service
+      dockerfile: Dockerfile
+    container_name: stable-roomies-student-service
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_APPLICATION_NAME: student-service
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/stable_roomies
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+
+  hostel-service:
+    build:
+      context: ../../backend/hostel-service
+      dockerfile: Dockerfile
+    container_name: stable-roomies-hostel-service
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_APPLICATION_NAME: hostel-service
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/stable_roomies
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+    depends_on:
+      - postgres
+      - redis
+
+  allocation-service:
+    build:
+      context: ../../backend/allocation-service
+      dockerfile: Dockerfile
+    container_name: stable-roomies-allocation-service
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_APPLICATION_NAME: allocation-service
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/stable_roomies
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+
+  notification-service:
+    build:
+      context: ../../backend/notification-service
+      dockerfile: Dockerfile
+    container_name: stable-roomies-notification-service
+    ports:
+      - "8084:8084"
+    environment:
+      SPRING_APPLICATION_NAME: notification-service
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/stable_roomies
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+    depends_on:
+      - postgres
+      - rabbitmq
+
+  # ── Algorithm Engine ─────────────────────────────────────────────────────────
+
+  algorithm-engine:
+    build:
+      context: ../../algorithm-engine
+      dockerfile: Dockerfile
+    container_name: stable-roomies-algorithm-engine
+    ports:
+      - "8090:8090"
+    environment:
+      APP_ENV: production
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/stable_roomies
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+
+  # ── Frontend ─────────────────────────────────────────────────────────────────
+
+  frontend:
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile
+    container_name: stable-roomies-frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - student-service
+      - hostel-service
+      - allocation-service
+
+  # ── Gateway ──────────────────────────────────────────────────────────────────
+
+  gateway:
+    image: caddy:2
+    container_name: stable-roomies-gateway
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../../gateway/Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+      - student-service
+      - hostel-service
+      - allocation-service
+      - notification-service
+      - algorithm-engine
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:
+  caddy_data:
+  caddy_config:

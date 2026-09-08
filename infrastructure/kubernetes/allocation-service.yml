@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: allocation-service
+  labels:
+    app: allocation-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: allocation-service
+  template:
+    metadata:
+      labels:
+        app: allocation-service
+    spec:
+      containers:
+        - name: allocation-service
+          image: stableroomies/allocation-service:latest
+          ports:
+            - containerPort: 8083
+          env:
+            - name: SPRING_APPLICATION_NAME
+              value: allocation-service
+          # TODO: Add DATABASE_URL, REDIS_URL, RABBITMQ_URL from Secrets
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: allocation-service
+spec:
+  selector:
+    app: allocation-service
+  ports:
+    - port: 8083
+      targetPort: 8083

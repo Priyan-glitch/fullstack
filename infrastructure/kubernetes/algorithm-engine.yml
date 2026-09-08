@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: algorithm-engine
+  labels:
+    app: algorithm-engine
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: algorithm-engine
+  template:
+    metadata:
+      labels:
+        app: algorithm-engine
+    spec:
+      containers:
+        - name: algorithm-engine
+          image: stableroomies/algorithm-engine:latest
+          ports:
+            - containerPort: 8090
+          env:
+            - name: APP_ENV
+              value: production
+          # TODO: Add DATABASE_URL, RABBITMQ_URL, REDIS_URL from Secrets
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: algorithm-engine
+spec:
+  selector:
+    app: algorithm-engine
+  ports:
+    - port: 8090
+      targetPort: 8090
