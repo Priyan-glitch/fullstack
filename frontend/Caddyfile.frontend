@@ -1,0 +1,14 @@
+:80 {
+    root * /srv
+
+    # Serve static files; fall back to index.html for React client-side routing
+    try_files {path} /index.html
+
+    file_server
+
+    # Cache static assets aggressively
+    @static {
+        path *.js *.css *.png *.svg *.ico *.woff *.woff2
+    }
+    header @static Cache-Control "public, max-age=31536000, immutable"
+}

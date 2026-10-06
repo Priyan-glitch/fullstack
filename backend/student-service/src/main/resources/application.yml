@@ -1,6 +1,10 @@
 spring:
   application:
     name: student-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/student_db
+    username: postgres
+    password: postgres
 
 server:
   port: 8081

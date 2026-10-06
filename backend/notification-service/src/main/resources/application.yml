@@ -1,6 +1,10 @@
 spring:
   application:
     name: notification-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/notification_db
+    username: postgres
+    password: postgres
 
 server:
   port: 8084

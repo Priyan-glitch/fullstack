@@ -1,54 +1,52 @@
 # Stable Roomies – Caddy Reverse Proxy / API Gateway
 #
-# In development, Caddy runs on localhost:80 and routes traffic
-# to each microservice by path prefix.
+# Development: runs on localhost, services on localhost ports.
+# Docker:      service names resolve via Docker DNS (e.g. student-service:8081).
 #
-# In production, replace :80 with your domain (e.g. stableroomies.example.com)
-# and Caddy will handle HTTPS/TLS automatically.
+# Replace :80 with your domain in production — Caddy handles TLS automatically.
 
 :80 {
 
-    # ── Frontend ────────────────────────────────────────────────────────────
-    # React dev server (Vite runs on 5173)
-    handle /* {
-        reverse_proxy localhost:5173
-    }
-
-    # ── Student Service ──────────────────────────────────────────────────────
+    # ── Student Service ───────────────────────────────────────────────────────
     handle /api/v1/students/* {
-        reverse_proxy localhost:8081
+        reverse_proxy student-service:8081
     }
 
     handle /api/v1/preferences/* {
-        reverse_proxy localhost:8081
+        reverse_proxy student-service:8081
     }
 
     # ── Hostel Service ────────────────────────────────────────────────────────
     handle /api/v1/hostels/* {
-        reverse_proxy localhost:8082
+        reverse_proxy hostel-service:8082
     }
 
     handle /api/v1/rooms/* {
-        reverse_proxy localhost:8082
+        reverse_proxy hostel-service:8082
     }
 
     # ── Allocation Service ────────────────────────────────────────────────────
     handle /api/v1/allocations/* {
-        reverse_proxy localhost:8083
+        reverse_proxy allocation-service:8083
     }
 
     handle /api/v1/room-changes/* {
-        reverse_proxy localhost:8083
+        reverse_proxy allocation-service:8083
     }
 
     # ── Notification Service ──────────────────────────────────────────────────
     handle /api/v1/notifications/* {
-        reverse_proxy localhost:8084
+        reverse_proxy notification-service:8084
     }
 
-    # ── Algorithm Engine (internal – not exposed publicly in production) ──────
+    # ── Algorithm Engine (internal) ───────────────────────────────────────────
     handle /api/v1/algorithm/* {
-        reverse_proxy localhost:8090
+        reverse_proxy algorithm-engine:8090
+    }
+
+    # ── Frontend (catch-all) ──────────────────────────────────────────────────
+    handle /* {
+        reverse_proxy frontend:80
     }
 
 }

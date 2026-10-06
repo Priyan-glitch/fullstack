@@ -1,6 +1,10 @@
 spring:
   application:
     name: allocation-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/allocation_db
+    username: postgres
+    password: postgres
 
 server:
   port: 8083

@@ -1,6 +1,10 @@
 spring:
   application:
     name: hostel-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/hostel_db
+    username: postgres
+    password: postgres
 
 server:
   port: 8082
