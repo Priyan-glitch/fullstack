@@ -1,5 +1,7 @@
 import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import AdminLayout from '../../layouts/AdminLayout';
+import { API_BASE_URL, HOSTEL_API_BASE_URL, API_ENDPOINTS } from '../../config/api';
 
 // Simple icon components
 const UsersIcon = ({ className }) => (
@@ -51,18 +53,60 @@ const DocumentIcon = ({ className }) => (
   </svg>
 );
 
+const RefreshIcon = ({ className }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+  </svg>
+);
+
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const [stats, setStats] = useState({
+    totalStudents: 0,
+    allocatedStudents: 0,
+    pendingAllocation: 0,
+    totalRooms: 0,
+    availableRooms: 0,
+    twoSharing: 0,
+    threeSharing: 0,
+    fourSharing: 0,
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Mock data - replace with API calls
-  const stats = {
-    totalStudents: 500,
-    allocatedStudents: 470,
-    pendingAllocation: 30,
-    totalRooms: 250,
-    availableRooms: 15,
-    twoSharing: 200,
-    threeSharing: 300,
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Fetch student stats
+      const studentResponse = await fetch(`${API_BASE_URL}${API_ENDPOINTS.ADMIN_STATS}`);
+      const studentData = await studentResponse.json();
+
+      // Fetch hostel/room stats
+      const hostelResponse = await fetch(`${HOSTEL_API_BASE_URL}${API_ENDPOINTS.HOSTEL_STATS}`);
+      const hostelData = await hostelResponse.json();
+
+      setStats({
+        totalStudents: studentData.totalStudents || 0,
+        allocatedStudents: studentData.allocatedStudents || 0,
+        pendingAllocation: studentData.pendingAllocation || 0,
+        totalRooms: hostelData.totalRooms || 0,
+        availableRooms: hostelData.availableRooms || 0,
+        twoSharing: hostelData.twoSharing || 0,
+        threeSharing: hostelData.threeSharing || 0,
+        fourSharing: hostelData.fourSharing || 0,
+      });
+    } catch (err) {
+      console.error('Error fetching dashboard data:', err);
+      setError('Failed to load dashboard data');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const StatCard = ({ title, value, subtitle, icon: Icon, color = 'blue' }) => {
@@ -116,10 +160,26 @@ export default function AdminDashboard() {
     <AdminLayout>
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-          <p className="text-sm text-gray-400 mt-0.5">Overview of hostel allocation system</p>
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
+            <p className="text-sm text-gray-400 mt-0.5">Overview of hostel allocation system</p>
+          </div>
+          <button
+            onClick={fetchDashboardData}
+            disabled={loading}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          >
+            <RefreshIcon className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
         </div>
+
+        {error && (
+          <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+            {error}
+          </div>
+        )}
 
         <div className="space-y-6">
           {/* Student Statistics */}
@@ -172,7 +232,7 @@ export default function AdminDashboard() {
           {/* Room Type Distribution */}
           <div>
             <h2 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Room Type Distribution</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-white rounded-xl border border-gray-100 p-4">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-sm font-medium text-gray-600">2-Sharing</p>
@@ -182,7 +242,7 @@ export default function AdminDashboard() {
                   <div 
                     className="h-2 rounded-full" 
                     style={{ 
-                      width: `${(stats.twoSharing / (stats.twoSharing + stats.threeSharing)) * 100}%`,
+                      width: `${stats.twoSharing > 0 ? (stats.twoSharing / (stats.twoSharing + stats.threeSharing + stats.fourSharing)) * 100 : 0}%`,
                       background: 'linear-gradient(90deg, #2d5016, #4a7c2c)'
                     }}
                   />
@@ -198,8 +258,24 @@ export default function AdminDashboard() {
                   <div 
                     className="h-2 rounded-full" 
                     style={{ 
-                      width: `${(stats.threeSharing / (stats.twoSharing + stats.threeSharing)) * 100}%`,
+                      width: `${stats.threeSharing > 0 ? (stats.threeSharing / (stats.twoSharing + stats.threeSharing + stats.fourSharing)) * 100 : 0}%`,
                       background: 'linear-gradient(90deg, #4a7c2c, #5a9a3a)'
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl border border-gray-100 p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium text-gray-600">4-Sharing</p>
+                  <p className="text-xl font-bold text-gray-900">{stats.fourSharing}</p>
+                </div>
+                <div className="w-full bg-gray-100 rounded-full h-2">
+                  <div 
+                    className="h-2 rounded-full" 
+                    style={{ 
+                      width: `${stats.fourSharing > 0 ? (stats.fourSharing / (stats.twoSharing + stats.threeSharing + stats.fourSharing)) * 100 : 0}%`,
+                      background: 'linear-gradient(90deg, #5a9a3a, #6db04a)'
                     }}
                   />
                 </div>

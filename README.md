@@ -68,6 +68,20 @@ stable-roomies/
 
 ## Running Locally
 
+### Quick Start - All Backend Services
+
+Use the convenience script to start all backend services at once:
+```bash
+start-backend-services.bat
+```
+
+This will open separate terminal windows for:
+- Student Service (port 8081)
+- Hostel Service (port 8082)  
+- Allocation Service (port 8083)
+
+### Manual Start
+
 ### 1. Infrastructure (Postgres, Redis, RabbitMQ)
 
 ```bash
@@ -117,3 +131,72 @@ caddy run --config gateway/Caddyfile
 ```bash
 docker compose -f infrastructure/docker/docker-compose.yml up --build
 ```
+
+
+---
+
+## API Documentation
+
+### New Endpoints
+
+#### Preferences API (Student Service - Port 8081)
+```bash
+# Get student preferences
+GET /api/preferences/student/{studentId}
+
+# Save or update preferences
+POST /api/preferences/student/{studentId}
+
+# Check if preferences exist
+GET /api/preferences/student/{studentId}/exists
+```
+
+#### Allocation API (Allocation Service - Port 8083)
+```bash
+# Get allocation status and room details
+GET /api/allocations/student/{studentId}
+
+# Get roommates for a student
+GET /api/allocations/student/{studentId}/roommates
+
+# Get sample allocated response (for testing)
+GET /api/allocations/student/{studentId}/sample
+
+# Health check
+GET /api/allocations/health
+```
+
+📚 **Complete API Documentation:** See [BACKEND_INTEGRATION_GUIDE.md](./BACKEND_INTEGRATION_GUIDE.md)
+
+---
+
+## Recent Updates
+
+### ✅ Implemented (Latest)
+
+1. **Student Preferences Service**
+   - Full CRUD API for student preferences
+   - Lifestyle preferences (sleep, cleanliness, noise, study time, social)
+   - Room preferences and additional requirements
+   - Integrated with frontend dashboard
+
+2. **Allocation Service (Template)**
+   - Status API ready for frontend integration
+   - Response structure defined
+   - Ready for algorithm-engine connection
+   - Currently returns template responses
+
+3. **Dashboard Integration**
+   - Fetches real preferences data from API
+   - Displays allocation status from API
+   - Shows dynamic recent activity
+   - Loading states and error handling
+
+### ⏳ Pending
+
+1. **PreferencesPage UI** - Form to collect and submit preferences
+2. **Algorithm Engine** - Compatibility scoring and matching logic
+3. **Database Persistence** - Store allocations in database
+4. **Admin Allocation Trigger** - Interface to run allocation
+
+---

@@ -36,7 +36,7 @@ const InformationCircleIcon = ({ className }) => (
 export default function AllocationPage() {
   // Simulate allocation status - in real app, fetch from API
   // States: 'not_allocated', 'in_progress', 'allocated'
-  const [allocationStatus] = useState('allocated');
+  const [allocationStatus] = useState('not_allocated');
   
   // Mock allocation data - in real app, fetch from backend
   const [allocationData] = useState({

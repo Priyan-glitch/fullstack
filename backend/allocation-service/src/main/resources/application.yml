@@ -1,10 +1,16 @@
+server:
+  port: 8083
+
 spring:
   application:
     name: allocation-service
-  datasource:
-    url: jdbc:postgresql://localhost:5432/allocation_db
-    username: postgres
-    password: postgres
 
-server:
-  port: 8083
+# Logging
+logging:
+  level:
+    com.stableroomies.allocationservice: DEBUG
+    org.springframework.web: INFO
+
+# CORS Configuration
+cors:
+  allowed-origins: http://localhost:5173

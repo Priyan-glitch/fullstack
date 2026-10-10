@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import AdminLayout from '../../layouts/AdminLayout';
+import { API_BASE_URL, API_ENDPOINTS } from '../../config/api';
 
 // Simple icon components
 const CogIcon = ({ className }) => (
@@ -60,11 +61,29 @@ export default function AllocationPage() {
   const [processedCount, setProcessedCount] = useState(0);
   const [expandedRoom, setExpandedRoom] = useState(null);
 
-  // Mock data
-  const stats = {
-    totalStudents: 500,
-    twoSharing: 200,
-    threeSharing: 300,
+  const [stats, setStats] = useState({
+    totalStudents: 0,
+    twoSharing: 0,
+    threeSharing: 0,
+  });
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
+
+  const fetchStats = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.ADMIN_STATS}`);
+      if (!response.ok) throw new Error('Failed to fetch stats');
+      const data = await response.json();
+      setStats({
+        totalStudents: data.totalStudents || 0,
+        twoSharing: data.twoSharing || 0,
+        threeSharing: data.threeSharing || 0,
+      });
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    }
   };
 
   // Mock proposed allocation

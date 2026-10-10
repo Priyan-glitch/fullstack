@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import AdminLayout from '../../layouts/AdminLayout';
+import { HOSTEL_API_BASE_URL, API_ENDPOINTS } from '../../config/api';
 
 // Simple icon components
 const HomeIcon = ({ className }) => (
@@ -65,45 +66,77 @@ export default function RoomsPage() {
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  // Mock room data - replace with API call
-  const [rooms, setRooms] = useState([
-    { id: 1, roomNumber: '101', hostel: 'Boys Hostel A', block: 'A', floor: 1, type: '2-Sharing', capacity: 2, occupied: 2, available: true },
-    { id: 2, roomNumber: '102', hostel: 'Boys Hostel A', block: 'A', floor: 1, type: '3-Sharing', capacity: 3, occupied: 2, available: true },
-    { id: 3, roomNumber: '103', hostel: 'Boys Hostel A', block: 'A', floor: 1, type: '3-Sharing', capacity: 3, occupied: 3, available: true },
-    { id: 4, roomNumber: '104', hostel: 'Boys Hostel A', block: 'A', floor: 1, type: '2-Sharing', capacity: 2, occupied: 0, available: true },
-    { id: 5, roomNumber: '201', hostel: 'Boys Hostel A', block: 'A', floor: 2, type: '2-Sharing', capacity: 2, occupied: 2, available: true },
-    { id: 6, roomNumber: '202', hostel: 'Boys Hostel A', block: 'A', floor: 2, type: '3-Sharing', capacity: 3, occupied: 1, available: true },
-    { id: 7, roomNumber: '105', hostel: 'Girls Hostel A', block: 'A', floor: 1, type: '2-Sharing', capacity: 2, occupied: 2, available: true },
-    { id: 8, roomNumber: '106', hostel: 'Girls Hostel A', block: 'A', floor: 1, type: '3-Sharing', capacity: 3, occupied: 0, available: false },
-  ]);
+  const [rooms, setRooms] = useState([]);
+  const [hostels, setHostels] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Available hostels for dropdown
-  const hostels = ['Boys Hostel A', 'Boys Hostel B', 'Girls Hostel A'];
+  useEffect(() => {
+    fetchHostels();
+    fetchRooms();
+  }, []);
+
+  const fetchHostels = async () => {
+    try {
+      const response = await fetch(`${HOSTEL_API_BASE_URL}${API_ENDPOINTS.HOSTELS}`);
+      if (!response.ok) throw new Error('Failed to fetch hostels');
+      const data = await response.json();
+      setHostels(data);
+    } catch (err) {
+      console.error('Error fetching hostels:', err);
+    }
+  };
+
+  const fetchRooms = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await fetch(`${HOSTEL_API_BASE_URL}${API_ENDPOINTS.ROOMS}`);
+      if (!response.ok) throw new Error('Failed to fetch rooms');
+      const data = await response.json();
+      setRooms(data);
+    } catch (err) {
+      console.error('Error fetching rooms:', err);
+      setError('Failed to load rooms');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const [formData, setFormData] = useState({
     roomNumber: '',
-    hostel: 'Boys Hostel A',
-    block: 'A',
-    floor: '1',
-    type: '2-Sharing',
-    capacity: '2',
+    hostelId: '',
+    floor: '',
+    block: '',
+    roomType: '2-Sharing',
+    capacity: 2,
+    currentOccupancy: 0,
     available: true,
   });
 
   // Filter rooms
   const filteredRooms = rooms.filter(room => {
-    const matchesSearch = 
-      room.roomNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      room.hostel.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = room.roomNumber.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesHostel = hostelFilter === 'all' || room.hostelId?.toString() === hostelFilter;
+    const matchesType = typeFilter === 'all' || room.roomType === typeFilter;
     
-    const matchesHostel = hostelFilter === 'all' || room.hostel === hostelFilter;
-    const matchesType = typeFilter === 'all' || room.type === typeFilter;
-    const matchesStatus = 
-      statusFilter === 'all' ||
-      (statusFilter === 'full' && room.occupied === room.capacity) ||
-      (statusFilter === 'partial' && room.occupied > 0 && room.occupied < room.capacity) ||
-      (statusFilter === 'empty' && room.occupied === 0) ||
-      (statusFilter === 'unavailable' && !room.available);
+    // Status filter logic
+    let matchesStatus = true;
+    if (statusFilter !== 'all') {
+      const occupied = room.occupiedCount || 0;
+      const capacity = room.capacity || 0;
+      const status = room.status || 'AVAILABLE';
+      
+      if (statusFilter === 'empty') {
+        matchesStatus = occupied === 0 && status === 'AVAILABLE';
+      } else if (statusFilter === 'partial') {
+        matchesStatus = occupied > 0 && occupied < capacity && status !== 'MAINTENANCE';
+      } else if (statusFilter === 'full') {
+        matchesStatus = occupied >= capacity || status === 'FULL';
+      } else if (statusFilter === 'unavailable') {
+        matchesStatus = status === 'MAINTENANCE';
+      }
+    }
 
     return matchesSearch && matchesHostel && matchesType && matchesStatus;
   });
@@ -112,12 +145,13 @@ export default function RoomsPage() {
     setEditingRoom(null);
     setFormData({
       roomNumber: '',
-      hostel: 'Boys Hostel A',
-      block: 'A',
-      floor: '1',
-      type: '2-Sharing',
-      capacity: '2',
-      available: true,
+      hostelId: '',
+      floor: '',
+      block: '',
+      roomType: '2-Sharing',
+      capacity: 2,
+      currentOccupancy: 0,
+      status: 'AVAILABLE',
     });
     setShowModal(true);
   };
@@ -126,54 +160,106 @@ export default function RoomsPage() {
     setEditingRoom(room);
     setFormData({
       roomNumber: room.roomNumber,
-      hostel: room.hostel,
-      block: room.block,
-      floor: room.floor.toString(),
-      type: room.type,
-      capacity: room.capacity.toString(),
-      available: room.available,
+      hostelId: room.hostelId?.toString() || '',
+      block: room.block || '',
+      floor: room.floor?.toString() || '',
+      roomType: room.roomType || '2-Sharing',
+      capacity: room.capacity?.toString() || '2',
+      currentOccupancy: room.occupiedCount || 0,
+      status: room.status || 'AVAILABLE',
     });
     setShowModal(true);
   };
 
-  const handleDelete = (roomId) => {
-    if (confirm('Are you sure you want to delete this room? This action cannot be undone.')) {
-      setRooms(rooms.filter(r => r.id !== roomId));
+  const handleDelete = async (roomId) => {
+    if (!window.confirm('Are you sure you want to delete this room? This action cannot be undone.')) return;
+    
+    try {
+      const response = await fetch(`${HOSTEL_API_BASE_URL}${API_ENDPOINTS.ROOM_BY_ID(roomId)}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) throw new Error('Failed to delete room');
+      
+      // Refresh room list
+      await fetchRooms();
+    } catch (err) {
+      console.error('Error deleting room:', err);
+      alert('Failed to delete room');
     }
   };
 
-  const handleToggleAvailable = (roomId) => {
-    setRooms(rooms.map(r => 
-      r.id === roomId ? { ...r, available: !r.available } : r
-    ));
+  const handleToggleAvailable = async (roomId) => {
+    try {
+      const room = rooms.find(r => r.id === roomId);
+      if (!room) return;
+
+      const newStatus = room.status === 'MAINTENANCE' ? 'AVAILABLE' : 'MAINTENANCE';
+
+      const response = await fetch(`${HOSTEL_API_BASE_URL}${API_ENDPOINTS.ROOM_BY_ID(roomId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...room,
+          status: newStatus,
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to toggle room availability');
+      
+      // Refresh room list
+      await fetchRooms();
+    } catch (err) {
+      console.error('Error toggling room availability:', err);
+      alert('Failed to toggle room availability');
+    }
   };
 
-  const handleSave = async () => {
+  const handleSave = async (e) => {
+    e?.preventDefault();
     setSaving(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
 
-    const roomData = {
-      ...formData,
-      floor: parseInt(formData.floor),
-      capacity: parseInt(formData.capacity),
-      occupied: editingRoom?.occupied || 0,
-    };
+    try {
+      const roomData = {
+        roomNumber: formData.roomNumber,
+        hostelId: parseInt(formData.hostelId),
+        floor: parseInt(formData.floor),
+        block: formData.block,
+        roomType: formData.roomType,
+        capacity: parseInt(formData.capacity),
+        occupiedCount: editingRoom?.occupiedCount || 0,
+        status: formData.status || 'AVAILABLE',
+      };
 
-    if (editingRoom) {
-      setRooms(rooms.map(r => r.id === editingRoom.id ? { ...r, ...roomData } : r));
-    } else {
-      setRooms([...rooms, { id: Date.now(), ...roomData }]);
+      const url = editingRoom 
+        ? `${HOSTEL_API_BASE_URL}${API_ENDPOINTS.ROOM_BY_ID(editingRoom.id)}`
+        : `${HOSTEL_API_BASE_URL}${API_ENDPOINTS.ROOMS}`;
+      
+      const method = editingRoom ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(roomData),
+      });
+
+      if (!response.ok) throw new Error('Failed to save room');
+
+      // Refresh room list
+      await fetchRooms();
+      setShowModal(false);
+    } catch (err) {
+      console.error('Error saving room:', err);
+      alert('Failed to save room');
+    } finally {
+      setSaving(false);
     }
-
-    setSaving(false);
-    setShowModal(false);
   };
 
   const handleChange = (field, value) => {
     setFormData(prev => {
       const newData = { ...prev, [field]: value };
-      // Auto-update capacity based on type
-      if (field === 'type') {
+      // Auto-update capacity based on roomType
+      if (field === 'roomType') {
         newData.capacity = value === '2-Sharing' ? '2' : '3';
       }
       return newData;
@@ -181,18 +267,20 @@ export default function RoomsPage() {
   };
 
   const getOccupancyBadge = (room) => {
-    if (!room.available) {
+    const status = room.status || 'AVAILABLE';
+    
+    if (status === 'MAINTENANCE') {
       return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">Unavailable</span>;
     }
     
-    if (room.occupied === 0) {
+    if (room.occupiedCount === 0 || status === 'AVAILABLE') {
       return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
         <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
         Empty
       </span>;
     }
     
-    if (room.occupied === room.capacity) {
+    if (room.occupiedCount >= room.capacity || status === 'FULL') {
       return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
         <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
         Full
@@ -205,15 +293,21 @@ export default function RoomsPage() {
     </span>;
   };
 
+  // Helper to get hostel name from ID
+  const getHostelName = (hostelId) => {
+    const hostel = hostels.find(h => h.id === hostelId);
+    return hostel ? hostel.name : 'Unknown';
+  };
+
   // Calculate statistics
   const stats = {
     total: rooms.length,
-    full: rooms.filter(r => r.occupied === r.capacity && r.available).length,
-    partial: rooms.filter(r => r.occupied > 0 && r.occupied < r.capacity && r.available).length,
-    empty: rooms.filter(r => r.occupied === 0 && r.available).length,
-    unavailable: rooms.filter(r => !r.available).length,
-    totalCapacity: rooms.reduce((sum, r) => sum + r.capacity, 0),
-    totalOccupied: rooms.reduce((sum, r) => sum + r.occupied, 0),
+    full: rooms.filter(r => r.status === 'FULL' || r.occupiedCount === r.capacity).length,
+    partial: rooms.filter(r => r.occupiedCount > 0 && r.occupiedCount < r.capacity && r.status !== 'MAINTENANCE').length,
+    empty: rooms.filter(r => r.occupiedCount === 0 && r.status === 'AVAILABLE').length,
+    unavailable: rooms.filter(r => r.status === 'MAINTENANCE').length,
+    totalCapacity: rooms.reduce((sum, r) => sum + (r.capacity || 0), 0),
+    totalOccupied: rooms.reduce((sum, r) => sum + (r.occupiedCount || 0), 0),
   };
 
   return (
@@ -291,7 +385,7 @@ export default function RoomsPage() {
               >
                 <option value="all">All Hostels</option>
                 {hostels.map(hostel => (
-                  <option key={hostel} value={hostel}>{hostel}</option>
+                  <option key={hostel.id} value={hostel.id.toString()}>{hostel.name}</option>
                 ))}
               </select>
             </div>
@@ -369,22 +463,22 @@ export default function RoomsPage() {
                       <span className="text-sm font-bold text-gray-900">{room.roomNumber}</span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="text-sm text-gray-700">{room.hostel}</span>
+                      <span className="text-sm text-gray-700">{getHostelName(room.hostelId)}</span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="text-sm text-gray-600">{room.block}</span>
+                      <span className="text-sm text-gray-600">{room.block || '-'}</span>
                     </td>
                     <td className="px-4 py-3">
                       <span className="text-sm text-gray-600">{room.floor}</span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="text-sm text-gray-700">{room.type}</span>
+                      <span className="text-sm text-gray-700">{room.roomType}</span>
                     </td>
                     <td className="px-4 py-3">
                       <span className="text-sm font-medium text-gray-900">{room.capacity}</span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="text-sm font-medium text-gray-900">{room.occupied}</span>
+                      <span className="text-sm font-medium text-gray-900">{room.occupiedCount || 0}</span>
                     </td>
                     <td className="px-4 py-3">
                       {getOccupancyBadge(room)}
@@ -401,16 +495,16 @@ export default function RoomsPage() {
                         <button
                           onClick={() => handleToggleAvailable(room.id)}
                           className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                            room.available 
-                              ? 'text-emerald-600 hover:bg-emerald-50' 
-                              : 'text-gray-400 hover:bg-gray-100'
+                            room.status === 'MAINTENANCE'
+                              ? 'text-gray-400 hover:bg-gray-100' 
+                              : 'text-emerald-600 hover:bg-emerald-50'
                           }`}
-                          title={room.available ? 'Mark as Unavailable' : 'Mark as Available'}
+                          title={room.status === 'MAINTENANCE' ? 'Mark as Available' : 'Mark as Unavailable'}
                         >
-                          {room.available ? (
-                            <CheckCircleIcon className="w-4 h-4" />
-                          ) : (
+                          {room.status === 'MAINTENANCE' ? (
                             <XCircleIcon className="w-4 h-4" />
+                          ) : (
+                            <CheckCircleIcon className="w-4 h-4" />
                           )}
                         </button>
                         <button
@@ -469,12 +563,13 @@ export default function RoomsPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Hostel *</label>
                 <select
-                  value={formData.hostel}
-                  onChange={(e) => handleChange('hostel', e.target.value)}
+                  value={formData.hostelId}
+                  onChange={(e) => handleChange('hostelId', e.target.value)}
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 >
+                  <option value="">Select Hostel</option>
                   {hostels.map(hostel => (
-                    <option key={hostel} value={hostel}>{hostel}</option>
+                    <option key={hostel.id} value={hostel.id}>{hostel.name}</option>
                   ))}
                 </select>
               </div>
@@ -507,8 +602,8 @@ export default function RoomsPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Room Type *</label>
                 <select
-                  value={formData.type}
-                  onChange={(e) => handleChange('type', e.target.value)}
+                  value={formData.roomType}
+                  onChange={(e) => handleChange('roomType', e.target.value)}
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 >
                   <option value="2-Sharing">2-Sharing</option>
@@ -531,8 +626,8 @@ export default function RoomsPage() {
                 <input
                   type="checkbox"
                   id="available"
-                  checked={formData.available}
-                  onChange={(e) => handleChange('available', e.target.checked)}
+                  checked={formData.status !== 'MAINTENANCE'}
+                  onChange={(e) => handleChange('status', e.target.checked ? 'AVAILABLE' : 'MAINTENANCE')}
                   className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
                 />
                 <label htmlFor="available" className="text-sm font-medium text-gray-700">
@@ -551,7 +646,7 @@ export default function RoomsPage() {
               </button>
               <button
                 onClick={handleSave}
-                disabled={saving || !formData.roomNumber || !formData.capacity}
+                disabled={saving || !formData.roomNumber || !formData.hostelId || !formData.capacity}
                 className="px-4 py-2 text-sm font-semibold text-white rounded-lg transition-all cursor-pointer disabled:opacity-60 flex items-center gap-2"
                 style={{ background: 'linear-gradient(135deg, #2d5016, #4a7c2c)' }}
               >

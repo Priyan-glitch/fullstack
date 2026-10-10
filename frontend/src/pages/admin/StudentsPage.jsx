@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import AdminLayout from '../../layouts/AdminLayout';
+import { API_BASE_URL, API_ENDPOINTS } from '../../config/api';
 
 // Simple icon components
 const SearchIcon = ({ className }) => (
@@ -49,115 +50,80 @@ export default function StudentsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [roomTypeFilter, setRoomTypeFilter] = useState('all');
+  const [activeFilter, setActiveFilter] = useState('all');
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [showPreferences, setShowPreferences] = useState(false);
+  const [studentPreferences, setStudentPreferences] = useState(null);
+  const [loadingPreferences, setLoadingPreferences] = useState(false);
+  const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Mock student data - replace with API call
-  const [students] = useState([
-    {
-      id: 1,
-      name: 'Arjun Kumar',
-      registerNo: '21IT001',
-      department: 'IT',
-      year: 3,
-      email: 'arjun@example.com',
-      phone: '+91 98765 43210',
-      roomType: '2-Sharing',
-      status: 'Allocated',
-      roomNumber: '204',
-      active: true,
-      preferences: {
-        sleepTime: 'Late (After 12 AM)',
-        wakeUpTime: 'Late (After 9 AM)',
-        noisePreference: 'Moderate',
-        cleanliness: 8,
-        studyFrequency: 'Frequently in room',
-        socialPreference: 'Moderate',
-      }
-    },
-    {
-      id: 2,
-      name: 'Priya Sharma',
-      registerNo: '21IT002',
-      department: 'IT',
-      year: 3,
-      email: 'priya@example.com',
-      phone: '+91 98765 43211',
-      roomType: '3-Sharing',
-      status: 'Pending',
-      roomNumber: null,
-      active: true,
-      preferences: {
-        sleepTime: 'Early (Before 11 PM)',
-        wakeUpTime: 'Early (Before 7 AM)',
-        noisePreference: 'Quiet',
-        cleanliness: 10,
-        studyFrequency: 'Often outside',
-        socialPreference: 'Introverted',
-      }
-    },
-    {
-      id: 3,
-      name: 'Mohamed Rahman',
-      registerNo: '21CS003',
-      department: 'CSE',
-      year: 3,
-      email: 'mohamed@example.com',
-      phone: '+91 98765 43212',
-      roomType: '2-Sharing',
-      status: 'Allocated',
-      roomNumber: '305',
-      active: true,
-      preferences: {
-        sleepTime: 'Moderate (11 PM - 12 AM)',
-        wakeUpTime: 'Moderate (7 AM - 9 AM)',
-        noisePreference: 'Moderate',
-        cleanliness: 7,
-        studyFrequency: 'Frequently in room',
-        socialPreference: 'Moderate',
-      }
-    },
-    {
-      id: 4,
-      name: 'Ananya Reddy',
-      registerNo: '21ECE004',
-      department: 'ECE',
-      year: 2,
-      email: 'ananya@example.com',
-      phone: '+91 98765 43213',
-      roomType: '3-Sharing',
-      status: 'Pending',
-      roomNumber: null,
-      active: false,
-      preferences: {
-        sleepTime: 'Late (After 12 AM)',
-        wakeUpTime: 'Late (After 9 AM)',
-        noisePreference: 'Lively',
-        cleanliness: 6,
-        studyFrequency: 'Mix of both',
-        socialPreference: 'Extroverted',
-      }
-    },
-  ]);
+  useEffect(() => {
+    fetchStudents();
+  }, []);
+
+  const fetchStudents = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.STUDENTS}`);
+      if (!response.ok) throw new Error('Failed to fetch students');
+      const data = await response.json();
+      setStudents(data);
+    } catch (err) {
+      console.error('Error fetching students:', err);
+      setError('Failed to load students');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Helper function to get student full name
+  const getStudentName = (student) => `${student.firstName} ${student.lastName}`;
+
+  // Helper function to get student initials
+  const getStudentInitials = (student) => {
+    return `${student.firstName[0]}${student.lastName[0]}`;
+  };
+
+  // Helper function to determine allocation status
+  const getAllocationStatus = (student) => {
+    if (student.roomNumber) return 'Allocated';
+    return 'Pending';
+  };
 
   // Filter students
   const filteredStudents = students.filter(student => {
+    const fullName = getStudentName(student).toLowerCase();
     const matchesSearch = 
-      student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      student.registerNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      fullName.includes(searchQuery.toLowerCase()) ||
+      student.registerNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
       student.email.toLowerCase().includes(searchQuery.toLowerCase());
     
     const matchesDepartment = departmentFilter === 'all' || student.department === departmentFilter;
-    const matchesStatus = statusFilter === 'all' || student.status === statusFilter;
-    const matchesRoomType = roomTypeFilter === 'all' || student.roomType === roomTypeFilter;
+    const allocationStatus = getAllocationStatus(student);
+    const matchesStatus = statusFilter === 'all' || allocationStatus === statusFilter;
+    const matchesActive = activeFilter === 'all' || 
+      (activeFilter === 'active' && student.active) || 
+      (activeFilter === 'inactive' && !student.active);
 
-    return matchesSearch && matchesDepartment && matchesStatus && matchesRoomType;
+    return matchesSearch && matchesDepartment && matchesStatus && matchesActive;
   });
 
-  const handleToggleActive = (studentId) => {
-    // In real app, make API call to toggle student active status
-    console.log('Toggle active status for student:', studentId);
+  const handleToggleActive = async (studentId) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.TOGGLE_STUDENT_ACTIVE(studentId)}`, {
+        method: 'PATCH',
+      });
+      if (!response.ok) throw new Error('Failed to toggle student status');
+      
+      // Refresh student list
+      await fetchStudents();
+    } catch (err) {
+      console.error('Error toggling student status:', err);
+      alert('Failed to toggle student status');
+    }
   };
 
   const handleViewProfile = (student) => {
@@ -165,14 +131,33 @@ export default function StudentsPage() {
     setShowPreferences(false);
   };
 
-  const handleViewPreferences = (student) => {
+  const handleViewPreferences = async (student) => {
     setSelectedStudent(student);
     setShowPreferences(true);
+    setLoadingPreferences(true);
+    setStudentPreferences(null);
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.PREFERENCES_BY_STUDENT(student.id)}`);
+      if (response.ok) {
+        const data = await response.json();
+        setStudentPreferences(data);
+      } else {
+        setStudentPreferences(null);
+      }
+    } catch (err) {
+      console.error('Error fetching preferences:', err);
+      setStudentPreferences(null);
+    } finally {
+      setLoadingPreferences(false);
+    }
   };
 
   const handleCloseModal = () => {
     setSelectedStudent(null);
     setShowPreferences(false);
+    setStudentPreferences(null);
+    setLoadingPreferences(false);
   };
 
   const getStatusBadge = (status) => {
@@ -225,38 +210,41 @@ export default function StudentsPage() {
                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
               >
                 <option value="all">All Departments</option>
-                <option value="CSE">CSE</option>
-                <option value="IT">IT</option>
-                <option value="ECE">ECE</option>
-                <option value="EEE">EEE</option>
-                <option value="MECH">MECH</option>
+                <option value="Computer Science">Computer Science</option>
+                <option value="Information Technology">Information Technology</option>
+                <option value="Electronics">Electronics</option>
+                <option value="Mechanical">Mechanical</option>
+                <option value="Civil">Civil</option>
+                <option value="Biomedical">Biomedical</option>
+                <option value="Electrical">Electrical</option>
+                <option value="Chemical">Chemical</option>
               </select>
             </div>
 
-            {/* Status Filter */}
+            {/* Allocation Status Filter */}
             <div>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
               >
-                <option value="all">All Status</option>
+                <option value="all">All Allocations</option>
                 <option value="Allocated">Allocated</option>
                 <option value="Pending">Pending</option>
                 <option value="Processing">Processing</option>
               </select>
             </div>
 
-            {/* Room Type Filter */}
+            {/* Active Status Filter */}
             <div>
               <select
-                value={roomTypeFilter}
-                onChange={(e) => setRoomTypeFilter(e.target.value)}
+                value={activeFilter}
+                onChange={(e) => setActiveFilter(e.target.value)}
                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
               >
-                <option value="all">All Room Types</option>
-                <option value="2-Sharing">2-Sharing</option>
-                <option value="3-Sharing">3-Sharing</option>
+                <option value="all">All Students</option>
+                <option value="active">Active Only</option>
+                <option value="inactive">Inactive Only</option>
               </select>
             </div>
           </div>
@@ -264,13 +252,13 @@ export default function StudentsPage() {
           {/* Results count */}
           <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
             <span>Showing {filteredStudents.length} of {students.length} students</span>
-            {(searchQuery || departmentFilter !== 'all' || statusFilter !== 'all' || roomTypeFilter !== 'all') && (
+            {(searchQuery || departmentFilter !== 'all' || statusFilter !== 'all' || activeFilter !== 'all') && (
               <button
                 onClick={() => {
                   setSearchQuery('');
                   setDepartmentFilter('all');
                   setStatusFilter('all');
-                  setRoomTypeFilter('all');
+                  setActiveFilter('all');
                 }}
                 className="flex items-center gap-1 text-green-600 hover:text-green-700 font-medium"
               >
@@ -291,8 +279,9 @@ export default function StudentsPage() {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Register No</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Department</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Room Type</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Allocation</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Room</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
@@ -303,31 +292,44 @@ export default function StudentsPage() {
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
                           style={{ background: 'linear-gradient(135deg, #2d5016, #4a7c2c)' }}>
-                          {student.name.split(' ').map(n => n[0]).join('')}
+                          {getStudentInitials(student)}
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-gray-900">{student.name}</p>
+                          <p className="text-sm font-medium text-gray-900">{getStudentName(student)}</p>
                           <p className="text-xs text-gray-500">{student.email}</p>
                         </div>
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="text-sm font-medium text-gray-700">{student.registerNo}</span>
+                      <span className="text-sm font-medium text-gray-700">{student.registerNumber}</span>
                     </td>
                     <td className="px-4 py-3">
                       <span className="text-sm text-gray-600">{student.department}</span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="text-sm text-gray-600">{student.roomType}</span>
+                      <span className="text-sm text-gray-600">-</span>
                     </td>
                     <td className="px-4 py-3">
-                      {getStatusBadge(student.status)}
+                      {getStatusBadge(getAllocationStatus(student))}
                     </td>
                     <td className="px-4 py-3">
                       {student.roomNumber ? (
                         <span className="text-sm font-medium text-gray-900">{student.roomNumber}</span>
                       ) : (
                         <span className="text-sm text-gray-400">-</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {student.active ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                          Active
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-400"></span>
+                          Inactive
+                        </span>
                       )}
                     </td>
                     <td className="px-4 py-3">
@@ -387,7 +389,7 @@ export default function StudentsPage() {
                 <h2 className="text-lg font-bold text-gray-900">
                   {showPreferences ? 'Student Preferences' : 'Student Profile'}
                 </h2>
-                <p className="text-sm text-gray-500 mt-0.5">{selectedStudent.name}</p>
+                <p className="text-sm text-gray-500 mt-0.5">{selectedStudent ? getStudentName(selectedStudent) : ''}</p>
               </div>
               <button
                 onClick={handleCloseModal}
@@ -401,61 +403,110 @@ export default function StudentsPage() {
             <div className="p-6">
               {showPreferences ? (
                 /* Preferences View */
-                <div className="space-y-4">
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Room Preference</h3>
-                    <div className="flex items-center gap-2">
-                      <span className="text-2xl font-bold text-gray-900">{selectedStudent.roomType}</span>
-                    </div>
+                loadingPreferences ? (
+                  <div className="py-12 text-center">
+                    <svg className="animate-spin w-8 h-8 text-green-600 mx-auto mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    <p className="text-sm text-gray-500">Loading preferences...</p>
                   </div>
+                ) : !studentPreferences ? (
+                  <div className="py-12 text-center">
+                    <p className="text-sm text-gray-500 mb-2">No preferences submitted yet</p>
+                    <p className="text-xs text-gray-400">This student hasn't filled out their preference form.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <h3 className="text-sm font-semibold text-gray-700 mb-3">Room Preference</h3>
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl font-bold text-gray-900">{studentPreferences.roomType || 'Not specified'}</span>
+                      </div>
+                    </div>
 
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Sleep & Routine</h3>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Sleep Time:</span>
-                        <span className="font-medium text-gray-900">{selectedStudent.preferences.sleepTime}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Wake Up Time:</span>
-                        <span className="font-medium text-gray-900">{selectedStudent.preferences.wakeUpTime}</span>
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <h3 className="text-sm font-semibold text-gray-700 mb-3">Lifestyle Preferences</h3>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Sleep Schedule:</span>
+                          <span className="font-medium text-gray-900">{studentPreferences.sleepSchedule || 'Not set'}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Cleanliness:</span>
+                          <span className="font-medium text-gray-900">{studentPreferences.cleanliness || 'Not set'}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Noise Level:</span>
+                          <span className="font-medium text-gray-900">{studentPreferences.noiseLevel || 'Not set'}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Study Time:</span>
+                          <span className="font-medium text-gray-900">{studentPreferences.studyTime || 'Not set'}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Social Preference:</span>
+                          <span className="font-medium text-gray-900">{studentPreferences.socialPreference || 'Not set'}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Lifestyle Preferences</h3>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Noise Preference:</span>
-                        <span className="font-medium text-gray-900">{selectedStudent.preferences.noisePreference}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Cleanliness Level:</span>
-                        <span className="font-medium text-gray-900">{selectedStudent.preferences.cleanliness}/10</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Study Frequency:</span>
-                        <span className="font-medium text-gray-900">{selectedStudent.preferences.studyFrequency}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Social Preference:</span>
-                        <span className="font-medium text-gray-900">{selectedStudent.preferences.socialPreference}</span>
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <h3 className="text-sm font-semibold text-gray-700 mb-3">Additional Preferences</h3>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Guest Policy:</span>
+                          <span className="font-medium text-gray-900">{studentPreferences.guestPolicy || 'Not set'}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Music:</span>
+                          <span className="font-medium text-gray-900">{studentPreferences.musicPreference || 'Not set'}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Food Preference:</span>
+                          <span className="font-medium text-gray-900">{studentPreferences.foodPreference || 'Not set'}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">AC Preference:</span>
+                          <span className="font-medium text-gray-900">{studentPreferences.acPreference || 'Not set'}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Sharing Items:</span>
+                          <span className="font-medium text-gray-900">{studentPreferences.sharingItems ? 'Yes' : 'No'}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Smoking:</span>
+                          <span className="font-medium text-gray-900">{studentPreferences.smoking ? 'Yes' : 'No'}</span>
+                        </div>
                       </div>
                     </div>
+
+                    {studentPreferences.additionalComments && (
+                      <div className="bg-gray-50 rounded-lg p-4">
+                        <h3 className="text-sm font-semibold text-gray-700 mb-2">Additional Comments</h3>
+                        <p className="text-sm text-gray-700">{studentPreferences.additionalComments}</p>
+                      </div>
+                    )}
+
+                    <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
+                      <p className="text-xs text-blue-700">
+                        Submitted: {studentPreferences.submitted ? 'Yes' : 'No'} • 
+                        Last Updated: {studentPreferences.updatedAt ? new Date(studentPreferences.updatedAt).toLocaleDateString() : 'N/A'}
+                      </p>
+                    </div>
                   </div>
-                </div>
+                )
               ) : (
                 /* Profile View */
                 <div className="space-y-4">
                   <div className="flex items-center gap-4 pb-4 border-b border-gray-100">
                     <div className="w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold text-white"
                       style={{ background: 'linear-gradient(135deg, #2d5016, #4a7c2c)' }}>
-                      {selectedStudent.name.split(' ').map(n => n[0]).join('')}
+                      {getStudentInitials(selectedStudent)}
                     </div>
                     <div>
-                      <h3 className="text-lg font-bold text-gray-900">{selectedStudent.name}</h3>
-                      <p className="text-sm text-gray-500">{selectedStudent.registerNo}</p>
+                      <h3 className="text-lg font-bold text-gray-900">{getStudentName(selectedStudent)}</h3>
+                      <p className="text-sm text-gray-500">{selectedStudent.registerNumber}</p>
                     </div>
                   </div>
 

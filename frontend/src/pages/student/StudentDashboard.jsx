@@ -1,45 +1,8 @@
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useUser } from '../../contexts/UserContext';
+import { API_BASE_URL, ALLOCATION_API_BASE_URL, API_ENDPOINTS } from '../../config/api';
 import StudentLayout from '../../layouts/StudentLayout';
-
-// ─── Placeholder data ─────────────────────────────────────────────────────────
-// Replace with real API data when backend is ready.
-// allocationStatus: 'not_started' | 'pending' | 'processing' | 'allocated'
-
-const student = {
-  name: 'Kathir',
-  rollNumber: 'CS2021042',
-  department: 'Computer Science',
-  email: 'kathir@example.com',
-  profileComplete: true,
-  profilePercent: 100,
-  preferencesSubmitted: true,
-  roomPreference: '3-Sharing',
-  allocationStatus: 'pending', // ← change this to test different states
-  room: null,
-  // allocationStatus: 'allocated'  →  uncomment room below
-  // room: {
-  //   number: '204',
-  //   block: 'A',
-  //   floor: 2,
-  //   type: '3-Sharing',
-  //   roommates: [
-  //     { name: 'Arjun S', department: 'IT', initials: 'A' },
-  //     { name: 'Mohamed R', department: 'ECE', initials: 'M' },
-  //   ],
-  // },
-  preferences: {
-    sleep: 'Late sleeper',
-    cleanliness: 'High',
-    noise: 'Quiet',
-    study: 'Frequently in room',
-    social: 'Moderate',
-  },
-  recentActivity: [
-    { label: 'Questionnaire submitted', date: '06 Oct 2026' },
-    { label: 'Room type selected', date: '06 Oct 2026' },
-    { label: 'Profile completed', date: '05 Oct 2026' },
-  ],
-};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -55,9 +18,9 @@ function getGreeting() {
 function StatusCard({ title, value, state, action, onAction }) {
   const configs = {
     success: { dot: 'bg-emerald-400', text: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
-    warning: { dot: 'bg-amber-400',   text: 'text-amber-600',   bg: 'bg-amber-50',   border: 'border-amber-100'   },
-    info:    { dot: 'bg-blue-400',    text: 'text-blue-600',    bg: 'bg-blue-50',    border: 'border-blue-100'    },
-    neutral: { dot: 'bg-gray-300',    text: 'text-gray-500',    bg: 'bg-gray-50',    border: 'border-gray-100'    },
+    warning: { dot: 'bg-amber-400', text: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
+    info: { dot: 'bg-blue-400', text: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
+    neutral: { dot: 'bg-gray-300', text: 'text-gray-500', bg: 'bg-gray-50', border: 'border-gray-100' },
   };
   const c = configs[state] || configs.neutral;
 
@@ -163,7 +126,7 @@ function RoomPreferenceCard({ value, onEdit }) {
       <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Room Preference</p>
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xl font-bold text-gray-900">{value}</p>
+          <p className="text-sm font-semibold text-gray-900">{value}</p>
           <p className="text-xs text-gray-400 mt-0.5">Your selected room type</p>
         </div>
         <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center flex-shrink-0">
@@ -184,11 +147,11 @@ function RoomPreferenceCard({ value, onEdit }) {
 
 function PreferenceSummaryCard({ preferences, onView }) {
   const rows = [
-    { label: 'Sleep',       value: preferences.sleep },
+    { label: 'Sleep', value: preferences.sleep },
     { label: 'Cleanliness', value: preferences.cleanliness },
-    { label: 'Noise',       value: preferences.noise },
-    { label: 'Study',       value: preferences.study },
-    { label: 'Social',      value: preferences.social },
+    { label: 'Noise', value: preferences.noise },
+    { label: 'Study', value: preferences.study },
+    { label: 'Social', value: preferences.social },
   ];
 
   return (
@@ -277,6 +240,89 @@ function RecentActivity({ activity }) {
 
 export default function StudentDashboard() {
   const navigate = useNavigate();
+  const { user } = useUser();
+
+  // State for API data
+  const [preferences, setPreferences] = useState(null);
+  const [allocation, setAllocation] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch preferences and allocation data
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        // Fetch preferences
+        const prefsResponse = await fetch(
+          `${API_BASE_URL}${API_ENDPOINTS.PREFERENCES_BY_STUDENT(user.id)}`
+        );
+        if (prefsResponse.ok) {
+          const prefsData = await prefsResponse.json();
+          setPreferences(prefsData);
+        }
+
+        // Fetch allocation status
+        const allocResponse = await fetch(
+          `${ALLOCATION_API_BASE_URL}${API_ENDPOINTS.ALLOCATION_BY_STUDENT(user.id)}`
+        );
+        if (allocResponse.ok) {
+          const allocData = await allocResponse.json();
+          setAllocation(allocData);
+        }
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user]);
+
+  // Map database fields to dashboard display data
+  const student = {
+    name: user ? `${user.firstName} ${user.lastName}` : 'Student',
+    rollNumber: user?.registerNumber || 'N/A',
+    department: user?.department || 'N/A',
+    email: user?.email || 'N/A',
+    profileComplete: user?.profileComplete || false,
+    profilePercent: user?.profileCompletionPercent || 0,
+    preferencesSubmitted: preferences?.submitted || false,
+    roomPreference: preferences?.roomType || 'Not Selected',
+    allocationStatus: allocation?.allocationStatus || 'not_started',
+    room: allocation?.room ? {
+      number: allocation.room.roomNumber,
+      hostelName: allocation.room.hostelName,
+      block: allocation.room.block,
+      floor: allocation.room.floor,
+      type: allocation.room.roomType,
+      roommates: (allocation.roommates || []).map(rm => ({
+        name: rm.name,
+        initials: rm.name.split(' ').map(n => n[0]).join(''),
+        department: rm.department
+      }))
+    } : null,
+    preferences: preferences ? {
+      sleep: preferences.sleepSchedule || 'Not set',
+      cleanliness: preferences.cleanliness || 'Not set',
+      noise: preferences.noiseLevel || 'Not set',
+      study: preferences.studyTime || 'Not set',
+      social: preferences.socialPreference || 'Not set',
+    } : {
+      sleep: 'Not set',
+      cleanliness: 'Not set',
+      noise: 'Not set',
+      study: 'Not set',
+      social: 'Not set',
+    },
+    recentActivity: [
+      { label: 'Profile completed', date: user?.createdAt ? new Date(user.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A' },
+      ...(preferences?.submittedAt ? [{ label: 'Preferences submitted', date: new Date(preferences.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) }] : []),
+      ...(allocation?.allocatedAt ? [{ label: 'Room allocated', date: new Date(allocation.allocatedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) }] : []),
+    ],
+  };
 
   const { allocationStatus } = student;
 
@@ -298,76 +344,88 @@ export default function StudentDashboard() {
     {
       title: 'Allocation',
       value:
-        allocationStatus === 'allocated'   ? 'Allocated'   :
-        allocationStatus === 'processing'  ? 'Processing'  :
-        allocationStatus === 'pending'     ? 'Pending'     :
-                                             'Not Started',
+        allocationStatus === 'allocated' ? 'Allocated' :
+          allocationStatus === 'processing' ? 'Processing' :
+            allocationStatus === 'pending' ? 'Pending' :
+              'Not Started',
       state:
-        allocationStatus === 'allocated'   ? 'success' :
-        allocationStatus === 'processing'  ? 'info'    :
-        allocationStatus === 'pending'     ? 'warning' :
-                                             'neutral',
+        allocationStatus === 'allocated' ? 'success' :
+          allocationStatus === 'processing' ? 'info' :
+            allocationStatus === 'pending' ? 'warning' :
+              'neutral',
     },
   ];
 
   return (
     <StudentLayout>
-      <div className="max-w-7xl mx-auto space-y-6">
-
-        {/* Welcome */}
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            {getGreeting()}, {student.name} 👋
-          </h1>
-          <p className="text-sm text-gray-400 mt-0.5">Here's your hostel allocation overview.</p>
+      {loading ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="flex flex-col items-center gap-3">
+            <svg className="animate-spin w-8 h-8 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            <p className="text-sm text-gray-500">Loading dashboard...</p>
+          </div>
         </div>
+      ) : (
+        <div className="max-w-7xl mx-auto space-y-6">
 
-        {/* Action required banner */}
-        <ActionRequired
-          status={allocationStatus}
-          profilePercent={student.profilePercent}
-          onAction={() => navigate('/student/profile')}
-        />
+          {/* Welcome */}
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">
+              {getGreeting()}, {student.name} 👋
+            </h1>
+            <p className="text-sm text-gray-400 mt-0.5">Here's your hostel allocation overview.</p>
+          </div>
 
-        {/* Status cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {statusCards.map((card) => (
-            <StatusCard key={card.title} {...card} />
-          ))}
-        </div>
+          {/* Action required banner */}
+          <ActionRequired
+            status={allocationStatus}
+            profilePercent={student.profilePercent}
+            onAction={() => navigate('/student/profile')}
+          />
 
-        {/* Main content grid - 2 columns on larger screens */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left column - Main allocation and preferences */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Allocation Card */}
-            <AllocationCard
-              status={allocationStatus}
-              room={student.room}
-              onViewRoom={() => navigate('/student/allocation')}
-            />
+          {/* Status cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {statusCards.map((card) => (
+              <StatusCard key={card.title} {...card} />
+            ))}
+          </div>
 
-            {/* Preference summary */}
-            {student.preferencesSubmitted && (
-              <PreferenceSummaryCard
-                preferences={student.preferences}
-                onView={() => navigate('/student/preferences')}
+          {/* Main content grid - 2 columns on larger screens */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left column - Main allocation and preferences */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Allocation Card */}
+              <AllocationCard
+                status={allocationStatus}
+                room={student.room}
+                onViewRoom={() => navigate('/student/allocation')}
               />
-            )}
+
+              {/* Preference summary */}
+              {student.preferencesSubmitted && (
+                <PreferenceSummaryCard
+                  preferences={student.preferences}
+                  onView={() => navigate('/student/preferences')}
+                />
+              )}
+            </div>
+
+            {/* Right column - Room preference and activity */}
+            <div className="space-y-6">
+              <RoomPreferenceCard
+                value={student.roomPreference}
+                onEdit={() => navigate('/student/preferences')}
+              />
+
+              <RecentActivity activity={student.recentActivity} />
+            </div>
           </div>
 
-          {/* Right column - Room preference and activity */}
-          <div className="space-y-6">
-            <RoomPreferenceCard
-              value={student.roomPreference}
-              onEdit={() => navigate('/student/preferences')}
-            />
-            
-            <RecentActivity activity={student.recentActivity} />
-          </div>
         </div>
-
-      </div>
+      )}
     </StudentLayout>
   );
 }

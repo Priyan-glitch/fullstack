@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useUser } from '../../contexts/UserContext';
+import { API_BASE_URL, API_ENDPOINTS } from '../../config/api';
 import StudentLayout from '../../layouts/StudentLayout';
 
 // Simple icon components
@@ -47,105 +49,169 @@ const CheckCircleIcon = ({ className }) => (
   </svg>
 );
 
+// Input field component - moved outside to prevent re-creation on state changes
+const InputField = ({ label, field, type = 'text', disabled = false, icon: Icon, value, onChange }) => (
+  <div>
+    <label className="block text-xs font-medium text-gray-500 mb-1.5">
+      {label}
+    </label>
+    <div className="relative">
+      {Icon && (
+        <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+          <Icon className="w-4 h-4 text-gray-400" />
+        </div>
+      )}
+      <input
+        type={type}
+        value={value || ''}
+        onChange={onChange}
+        disabled={disabled}
+        className={`w-full ${Icon ? 'pl-10' : 'pl-3'} pr-3 py-2 text-sm border rounded-lg transition-colors
+          ${disabled 
+            ? 'bg-gray-50 border-gray-100 text-gray-600 cursor-not-allowed' 
+            : 'bg-white border-gray-200 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent'
+          }`}
+      />
+    </div>
+  </div>
+);
+
+// Select field component - moved outside to prevent re-creation on state changes
+const SelectField = ({ label, field, options, disabled = false, value, onChange }) => (
+  <div>
+    <label className="block text-xs font-medium text-gray-500 mb-1.5">
+      {label}
+    </label>
+    <select
+      value={value || ''}
+      onChange={onChange}
+      disabled={disabled}
+      className={`w-full px-3 py-2 text-sm border rounded-lg transition-colors
+        ${disabled 
+          ? 'bg-gray-50 border-gray-100 text-gray-600 cursor-not-allowed' 
+          : 'bg-white border-gray-200 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent'
+        }`}
+    >
+      {options.map(opt => (
+        <option key={opt} value={opt}>{opt}</option>
+      ))}
+    </select>
+  </div>
+);
+
 export default function ProfilePage() {
+  const { user, updateUser } = useUser();
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   
-  // Mock data - replace with API call
-  const [profile, setProfile] = useState({
-    firstName: 'Kathir',
-    lastName: 'Kumar',
-    email: 'kathir@example.com',
-    phone: '+91 98765 43210',
-    rollNumber: 'CS2021042',
-    department: 'Computer Science',
-    year: 3,
-    semester: 5,
-    dateOfBirth: '2003-05-15',
-    bloodGroup: 'O+',
-    gender: 'Male',
-    address: '123 Main Street, Chennai',
-    city: 'Chennai',
-    state: 'Tamil Nadu',
-    pincode: '600001',
-    guardianName: 'Kumar Rajan',
-    guardianPhone: '+91 98765 00000',
-    guardianRelation: 'Father',
-    emergencyContact: '+91 98765 11111',
-  });
+  // Initialize profile from user context
+  const [profile, setProfile] = useState(null);
+  const [formData, setFormData] = useState(null);
 
-  const [formData, setFormData] = useState(profile);
+  useEffect(() => {
+    if (user) {
+      const profileData = {
+        firstName: user.firstName || '',
+        lastName: user.lastName || '',
+        email: user.email || '',
+        phone: user.phone || '',
+        rollNumber: user.registerNumber || '', // Map registerNumber to rollNumber for display
+        registerNumber: user.registerNumber || '', // Keep for API
+        department: user.department || '',
+        year: user.year || '',
+        semester: user.semester || '',
+        dateOfBirth: user.dateOfBirth || '',
+        bloodGroup: user.bloodGroup || '',
+        gender: user.gender || '',
+        address: user.address || '',
+        city: user.city || '',
+        state: user.state || '',
+        pincode: user.pincode || '',
+        guardianName: user.guardianName || '',
+        guardianPhone: user.guardianPhone || '',
+        guardianRelation: user.guardianRelation || '',
+        emergencyContact: user.emergencyContact || '',
+      };
+      setProfile(profileData);
+      setFormData(profileData);
+      setLoading(false);
+    }
+  }, [user]);
 
   const handleEdit = () => {
     setIsEditing(true);
-    setFormData(profile);
+    setError('');
+    setSuccess('');
   };
 
   const handleCancel = () => {
     setIsEditing(false);
     setFormData(profile);
+    setError('');
   };
 
   const handleSave = async () => {
     setSaving(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setProfile(formData);
-    setIsEditing(false);
-    setSaving(false);
+    setError('');
+    setSuccess('');
+
+    try {
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.STUDENT_BY_ID(user.id)}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update profile');
+      }
+
+      const updatedStudent = await response.json();
+      
+      // Update local state and context
+      setProfile(formData);
+      updateUser(updatedStudent);
+      setIsEditing(false);
+      setSuccess('Profile updated successfully!');
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      console.error('Error updating profile:', err);
+      setError('Failed to update profile. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const InputField = ({ label, field, type = 'text', disabled = false, icon: Icon }) => (
-    <div>
-      <label className="block text-xs font-medium text-gray-500 mb-1.5">
-        {label}
-      </label>
-      <div className="relative">
-        {Icon && (
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-            <Icon className="w-4 h-4 text-gray-400" />
-          </div>
-        )}
-        <input
-          type={type}
-          value={formData[field] || ''}
-          onChange={(e) => handleChange(field, e.target.value)}
-          disabled={disabled || !isEditing}
-          className={`w-full ${Icon ? 'pl-10' : 'pl-3'} pr-3 py-2 text-sm border rounded-lg transition-colors
-            ${disabled || !isEditing 
-              ? 'bg-gray-50 border-gray-100 text-gray-600 cursor-not-allowed' 
-              : 'bg-white border-gray-200 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent'
-            }`}
-        />
-      </div>
-    </div>
-  );
+  if (loading) {
+    return (
+      <StudentLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-gray-500">Loading profile...</div>
+        </div>
+      </StudentLayout>
+    );
+  }
 
-  const SelectField = ({ label, field, options, disabled = false }) => (
-    <div>
-      <label className="block text-xs font-medium text-gray-500 mb-1.5">
-        {label}
-      </label>
-      <select
-        value={formData[field] || ''}
-        onChange={(e) => handleChange(field, e.target.value)}
-        disabled={disabled || !isEditing}
-        className={`w-full px-3 py-2 text-sm border rounded-lg transition-colors
-          ${disabled || !isEditing 
-            ? 'bg-gray-50 border-gray-100 text-gray-600 cursor-not-allowed' 
-            : 'bg-white border-gray-200 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent'
-          }`}
-      >
-        {options.map(opt => (
-          <option key={opt} value={opt}>{opt}</option>
-        ))}
-      </select>
-    </div>
-  );
+  if (!profile) {
+    return (
+      <StudentLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-red-500">Failed to load profile</div>
+        </div>
+      </StudentLayout>
+    );
+  }
 
   const profileCompletion = 100; // Calculate based on filled fields
 
@@ -197,6 +263,24 @@ export default function ProfilePage() {
           )}
         </div>
 
+        {/* Success Message */}
+        {success && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 flex items-center gap-3">
+            <CheckCircleIcon className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+            <p className="text-sm font-medium text-emerald-800">{success}</p>
+          </div>
+        )}
+
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-center gap-3">
+            <svg className="w-5 h-5 text-red-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p className="text-sm font-medium text-red-800">{error}</p>
+          </div>
+        )}
+
         <div className="space-y-4">
           {/* Profile Completion */}
           {profileCompletion === 100 && (
@@ -242,20 +326,62 @@ export default function ProfilePage() {
             
             <div className="p-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <InputField label="First Name" field="firstName" icon={UserIcon} />
-                <InputField label="Last Name" field="lastName" />
-                <InputField label="Email Address" field="email" type="email" icon={EnvelopeIcon} disabled />
-                <InputField label="Phone Number" field="phone" type="tel" icon={PhoneIcon} />
-                <InputField label="Date of Birth" field="dateOfBirth" type="date" />
+                <InputField 
+                  label="First Name" 
+                  field="firstName" 
+                  icon={UserIcon} 
+                  value={formData.firstName}
+                  onChange={(e) => handleChange('firstName', e.target.value)}
+                  disabled={!isEditing}
+                />
+                <InputField 
+                  label="Last Name" 
+                  field="lastName" 
+                  value={formData.lastName}
+                  onChange={(e) => handleChange('lastName', e.target.value)}
+                  disabled={!isEditing}
+                />
+                <InputField 
+                  label="Email Address" 
+                  field="email" 
+                  type="email" 
+                  icon={EnvelopeIcon} 
+                  value={formData.email}
+                  onChange={(e) => handleChange('email', e.target.value)}
+                  disabled={true}
+                />
+                <InputField 
+                  label="Phone Number" 
+                  field="phone" 
+                  type="tel" 
+                  icon={PhoneIcon} 
+                  value={formData.phone}
+                  onChange={(e) => handleChange('phone', e.target.value)}
+                  disabled={!isEditing}
+                />
+                <InputField 
+                  label="Date of Birth" 
+                  field="dateOfBirth" 
+                  type="date" 
+                  value={formData.dateOfBirth}
+                  onChange={(e) => handleChange('dateOfBirth', e.target.value)}
+                  disabled={!isEditing}
+                />
                 <SelectField 
                   label="Blood Group" 
                   field="bloodGroup" 
                   options={['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-']} 
+                  value={formData.bloodGroup}
+                  onChange={(e) => handleChange('bloodGroup', e.target.value)}
+                  disabled={!isEditing}
                 />
                 <SelectField 
                   label="Gender" 
                   field="gender" 
                   options={['Male', 'Female', 'Other', 'Prefer not to say']} 
+                  value={formData.gender}
+                  onChange={(e) => handleChange('gender', e.target.value)}
+                  disabled={!isEditing}
                 />
               </div>
             </div>
@@ -272,19 +398,35 @@ export default function ProfilePage() {
             
             <div className="p-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <InputField label="Roll Number" field="rollNumber" disabled />
-                <InputField label="Department" field="department" disabled />
+                <InputField 
+                  label="Roll Number" 
+                  field="rollNumber" 
+                  value={formData.rollNumber}
+                  onChange={(e) => handleChange('rollNumber', e.target.value)}
+                  disabled={true}
+                />
+                <InputField 
+                  label="Department" 
+                  field="department" 
+                  value={formData.department}
+                  onChange={(e) => handleChange('department', e.target.value)}
+                  disabled={true}
+                />
                 <SelectField 
                   label="Current Year" 
                   field="year" 
                   options={['1', '2', '3', '4']} 
-                  disabled 
+                  value={formData.year}
+                  onChange={(e) => handleChange('year', e.target.value)}
+                  disabled={true}
                 />
                 <SelectField 
                   label="Current Semester" 
                   field="semester" 
                   options={['1', '2', '3', '4', '5', '6', '7', '8']} 
-                  disabled 
+                  value={formData.semester}
+                  onChange={(e) => handleChange('semester', e.target.value)}
+                  disabled={true}
                 />
               </div>
             </div>
@@ -301,11 +443,36 @@ export default function ProfilePage() {
             
             <div className="p-5">
               <div className="grid grid-cols-1 gap-4">
-                <InputField label="Street Address" field="address" icon={BuildingIcon} />
+                <InputField 
+                  label="Street Address" 
+                  field="address" 
+                  icon={BuildingIcon} 
+                  value={formData.address}
+                  onChange={(e) => handleChange('address', e.target.value)}
+                  disabled={!isEditing}
+                />
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <InputField label="City" field="city" />
-                  <InputField label="State" field="state" />
-                  <InputField label="PIN Code" field="pincode" />
+                  <InputField 
+                    label="City" 
+                    field="city" 
+                    value={formData.city}
+                    onChange={(e) => handleChange('city', e.target.value)}
+                    disabled={!isEditing}
+                  />
+                  <InputField 
+                    label="State" 
+                    field="state" 
+                    value={formData.state}
+                    onChange={(e) => handleChange('state', e.target.value)}
+                    disabled={!isEditing}
+                  />
+                  <InputField 
+                    label="PIN Code" 
+                    field="pincode" 
+                    value={formData.pincode}
+                    onChange={(e) => handleChange('pincode', e.target.value)}
+                    disabled={!isEditing}
+                  />
                 </div>
               </div>
             </div>
@@ -322,14 +489,40 @@ export default function ProfilePage() {
             
             <div className="p-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <InputField label="Guardian Name" field="guardianName" icon={UserIcon} />
-                <InputField label="Guardian Phone" field="guardianPhone" type="tel" icon={PhoneIcon} />
+                <InputField 
+                  label="Guardian Name" 
+                  field="guardianName" 
+                  icon={UserIcon} 
+                  value={formData.guardianName}
+                  onChange={(e) => handleChange('guardianName', e.target.value)}
+                  disabled={!isEditing}
+                />
+                <InputField 
+                  label="Guardian Phone" 
+                  field="guardianPhone" 
+                  type="tel" 
+                  icon={PhoneIcon} 
+                  value={formData.guardianPhone}
+                  onChange={(e) => handleChange('guardianPhone', e.target.value)}
+                  disabled={!isEditing}
+                />
                 <SelectField 
                   label="Relation" 
                   field="guardianRelation" 
                   options={['Father', 'Mother', 'Guardian', 'Other']} 
+                  value={formData.guardianRelation}
+                  onChange={(e) => handleChange('guardianRelation', e.target.value)}
+                  disabled={!isEditing}
                 />
-                <InputField label="Emergency Contact" field="emergencyContact" type="tel" icon={PhoneIcon} />
+                <InputField 
+                  label="Emergency Contact" 
+                  field="emergencyContact" 
+                  type="tel" 
+                  icon={PhoneIcon} 
+                  value={formData.emergencyContact}
+                  onChange={(e) => handleChange('emergencyContact', e.target.value)}
+                  disabled={!isEditing}
+                />
               </div>
             </div>
           </div>

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
+import { useUser } from '../contexts/UserContext';
 
 const navItems = [
   {
@@ -49,16 +50,25 @@ const navItems = [
   },
 ];
 
-// Placeholder student — replace with auth context later
-const currentStudent = {
-  name: 'Kathir',
-  email: 'kathir@example.com',
-  initials: 'K',
-};
-
 export default function StudentLayout({ children }) {
   const navigate = useNavigate();
+  const { user, logout } = useUser();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  // Get user initials
+  const getInitials = () => {
+    if (!user) return '?';
+    const first = user.firstName?.[0] || '';
+    const last = user.lastName?.[0] || '';
+    return (first + last).toUpperCase() || '?';
+  };
+
+  const userName = user ? `${user.firstName} ${user.lastName}` : 'Student';
 
   return (
     <div className="min-h-screen h-screen bg-gray-50 flex flex-col overflow-hidden">
@@ -107,11 +117,11 @@ export default function StudentLayout({ children }) {
           <div className="flex items-center gap-2 pl-2 border-l border-gray-100">
             <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold text-white flex-shrink-0"
               style={{ background: 'linear-gradient(135deg, #2d5016, #4a7c2c)' }}>
-              {currentStudent.initials}
+              {getInitials()}
             </div>
-            <span className="hidden sm:block text-sm font-medium text-gray-700">{currentStudent.name}</span>
+            <span className="hidden sm:block text-sm font-medium text-gray-700">{userName}</span>
             <button
-              onClick={() => navigate('/login')}
+              onClick={handleLogout}
               className="ml-1 p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition cursor-pointer"
               aria-label="Sign out"
               title="Sign out"

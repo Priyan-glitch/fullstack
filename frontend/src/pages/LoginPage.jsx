@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE_URL, API_ENDPOINTS } from '../config/api';
+import { useUser } from '../contexts/UserContext';
 
 const roles = [
   {
@@ -26,6 +28,7 @@ const roles = [
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const { login } = useUser();
   const [selectedRole, setSelectedRole] = useState('student');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -44,15 +47,40 @@ export default function LoginPage() {
 
     setLoading(true);
 
-    // TODO: Replace with Clerk authentication
-    setTimeout(() => {
-      setLoading(false);
-      if (selectedRole === 'student') {
-        navigate('/student/dashboard');
+    try {
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.LOGIN}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: email,
+          password: password,
+          role: selectedRole
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Use context to store user data
+        login(data.student, data.role);
+        
+        // Redirect based on role
+        if (data.role === 'admin') {
+          navigate('/admin/dashboard');
+        } else {
+          navigate('/student/dashboard');
+        }
       } else {
-        navigate('/admin/dashboard');
+        setError(data.message || 'Invalid credentials');
       }
-    }, 1000);
+    } catch (error) {
+      console.error('Login error:', error);
+      setError('Unable to connect to server. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

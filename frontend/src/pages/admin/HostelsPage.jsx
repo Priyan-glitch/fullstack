@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import AdminLayout from '../../layouts/AdminLayout';
+import { HOSTEL_API_BASE_URL, API_ENDPOINTS } from '../../config/api';
 
 // Simple icon components
 const BuildingIcon = ({ className }) => (
@@ -48,82 +49,52 @@ export default function HostelsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingHostel, setEditingHostel] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [hostels, setHostels] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Mock hostel data - replace with API call
-  const [hostels, setHostels] = useState([
-    {
-      id: 1,
-      name: 'Boys Hostel A',
-      gender: 'Male',
-      capacity: 300,
-      occupied: 285,
-      totalRooms: 100,
-      occupiedRooms: 95,
-      floors: 5,
-      blocks: ['A', 'B'],
-      amenities: ['WiFi', 'Gym', 'Common Room', 'Mess'],
-      wardenName: 'Mr. Rajesh Kumar',
-      wardenPhone: '+91 98765 43210',
-      address: 'Campus Road, Main Block',
-    },
-    {
-      id: 2,
-      name: 'Girls Hostel A',
-      gender: 'Female',
-      capacity: 250,
-      occupied: 240,
-      totalRooms: 85,
-      occupiedRooms: 82,
-      floors: 4,
-      blocks: ['A'],
-      amenities: ['WiFi', 'Common Room', 'Mess', 'Reading Room'],
-      wardenName: 'Mrs. Priya Sharma',
-      wardenPhone: '+91 98765 43211',
-      address: 'Campus Road, East Wing',
-    },
-    {
-      id: 3,
-      name: 'Boys Hostel B',
-      gender: 'Male',
-      capacity: 200,
-      occupied: 185,
-      totalRooms: 70,
-      occupiedRooms: 65,
-      floors: 4,
-      blocks: ['A'],
-      amenities: ['WiFi', 'Common Room', 'Mess'],
-      wardenName: 'Mr. Suresh Babu',
-      wardenPhone: '+91 98765 43212',
-      address: 'Campus Road, West Wing',
-    },
-  ]);
+  useEffect(() => {
+    fetchHostels();
+  }, []);
+
+  const fetchHostels = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await fetch(`${HOSTEL_API_BASE_URL}${API_ENDPOINTS.HOSTELS}`);
+      if (!response.ok) throw new Error('Failed to fetch hostels');
+      const data = await response.json();
+      setHostels(data);
+    } catch (err) {
+      console.error('Error fetching hostels:', err);
+      setError('Failed to load hostels');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const [formData, setFormData] = useState({
     name: '',
-    gender: 'Male',
-    capacity: '',
+    address: '',
+    totalCapacity: '',
     totalRooms: '',
-    floors: '',
-    blocks: '',
-    amenities: '',
+    genderType: 'MALE',
     wardenName: '',
     wardenPhone: '',
-    address: '',
+    amenities: '',
   });
 
   const handleAdd = () => {
     setEditingHostel(null);
     setFormData({
       name: '',
-      gender: 'Male',
-      capacity: '',
+      address: '',
+      totalCapacity: '',
       totalRooms: '',
-      floors: '',
-      blocks: '',
-      amenities: '',
+      genderType: 'MALE',
       wardenName: '',
       wardenPhone: '',
-      address: '',
+      amenities: '',
     });
     setShowModal(true);
   };
@@ -132,48 +103,67 @@ export default function HostelsPage() {
     setEditingHostel(hostel);
     setFormData({
       name: hostel.name,
-      gender: hostel.gender,
-      capacity: hostel.capacity.toString(),
-      totalRooms: hostel.totalRooms.toString(),
-      floors: hostel.floors.toString(),
-      blocks: hostel.blocks.join(', '),
-      amenities: hostel.amenities.join(', '),
-      wardenName: hostel.wardenName,
-      wardenPhone: hostel.wardenPhone,
-      address: hostel.address,
+      address: hostel.address || '',
+      totalCapacity: hostel.totalCapacity,
+      totalRooms: hostel.totalRooms || '',
+      genderType: hostel.genderType,
+      wardenName: hostel.wardenName || '',
+      wardenPhone: hostel.wardenPhone || '',
+      amenities: hostel.amenities || '',
     });
     setShowModal(true);
   };
 
-  const handleDelete = (hostelId) => {
-    if (confirm('Are you sure you want to delete this hostel? This action cannot be undone.')) {
-      setHostels(hostels.filter(h => h.id !== hostelId));
+  const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this hostel?')) return;
+    
+    try {
+      const response = await fetch(`${HOSTEL_API_BASE_URL}${API_ENDPOINTS.HOSTEL_BY_ID(id)}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) throw new Error('Failed to delete hostel');
+      await fetchHostels();
+    } catch (err) {
+      console.error('Error deleting hostel:', err);
+      alert('Failed to delete hostel');
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = async (e) => {
+    e.preventDefault();
     setSaving(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
 
-    const hostelData = {
-      ...formData,
-      capacity: parseInt(formData.capacity),
-      totalRooms: parseInt(formData.totalRooms),
-      floors: parseInt(formData.floors),
-      blocks: formData.blocks.split(',').map(b => b.trim()).filter(b => b),
-      amenities: formData.amenities.split(',').map(a => a.trim()).filter(a => a),
-      occupied: editingHostel?.occupied || 0,
-      occupiedRooms: editingHostel?.occupiedRooms || 0,
-    };
+    try {
+      const hostelData = {
+        ...formData,
+        totalCapacity: parseInt(formData.totalCapacity),
+        totalRooms: parseInt(formData.totalRooms),
+        availableCapacity: editingHostel ? editingHostel.availableCapacity : parseInt(formData.totalCapacity),
+        active: true,
+      };
 
-    if (editingHostel) {
-      setHostels(hostels.map(h => h.id === editingHostel.id ? { ...h, ...hostelData } : h));
-    } else {
-      setHostels([...hostels, { id: Date.now(), ...hostelData }]);
+      const url = editingHostel 
+        ? `${HOSTEL_API_BASE_URL}${API_ENDPOINTS.HOSTEL_BY_ID(editingHostel.id)}`
+        : `${HOSTEL_API_BASE_URL}${API_ENDPOINTS.HOSTELS}`;
+      
+      const method = editingHostel ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(hostelData),
+      });
+
+      if (!response.ok) throw new Error('Failed to save hostel');
+
+      await fetchHostels();
+      setShowModal(false);
+    } catch (err) {
+      console.error('Error saving hostel:', err);
+      alert('Failed to save hostel');
+    } finally {
+      setSaving(false);
     }
-
-    setSaving(false);
-    setShowModal(false);
   };
 
   const handleChange = (field, value) => {
@@ -231,7 +221,7 @@ export default function HostelsPage() {
               <div>
                 <p className="text-xs text-gray-500">Total Capacity</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {hostels.reduce((sum, h) => sum + h.capacity, 0)}
+                  {hostels.reduce((sum, h) => sum + (h.totalCapacity || 0), 0)}
                 </p>
               </div>
             </div>
@@ -243,9 +233,9 @@ export default function HostelsPage() {
                 <HomeIcon className="w-5 h-5 text-emerald-600" />
               </div>
               <div>
-                <p className="text-xs text-gray-500">Total Rooms</p>
+                <p className="text-xs text-gray-500">Available Capacity</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {hostels.reduce((sum, h) => sum + h.totalRooms, 0)}
+                  {hostels.reduce((sum, h) => sum + (h.availableCapacity || 0), 0)}
                 </p>
               </div>
             </div>
@@ -254,9 +244,22 @@ export default function HostelsPage() {
 
         {/* Hostels Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {hostels.map((hostel) => {
-            const occupancyPercentage = getOccupancyPercentage(hostel.occupied, hostel.capacity);
-            const roomOccupancyPercentage = getOccupancyPercentage(hostel.occupiedRooms, hostel.totalRooms);
+          {loading && (
+            <div className="col-span-2 text-center py-12">
+              <p className="text-gray-500">Loading hostels...</p>
+            </div>
+          )}
+          
+          {error && (
+            <div className="col-span-2 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+              {error}
+            </div>
+          )}
+
+          {!loading && !error && hostels.map((hostel) => {
+            const occupancyPercentage = hostel.totalCapacity > 0 
+              ? Math.round(((hostel.totalCapacity - hostel.availableCapacity) / hostel.totalCapacity) * 100)
+              : 0;
 
             return (
               <div key={hostel.id} className="bg-white rounded-xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
@@ -266,7 +269,7 @@ export default function HostelsPage() {
                     <div className="flex-1">
                       <h3 className="text-lg font-bold text-white">{hostel.name}</h3>
                       <p className="text-sm text-white/80 mt-0.5">
-                        {hostel.gender} • {hostel.floors} Floors • Block {hostel.blocks.join(', ')}
+                        {hostel.genderType} • {hostel.address || 'No address'}
                       </p>
                     </div>
                     <div className="flex items-center gap-1">
@@ -290,17 +293,31 @@ export default function HostelsPage() {
 
                 {/* Body */}
                 <div className="p-5 space-y-4">
+                  {/* Stats Row */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <p className="text-xs text-gray-500 mb-1">Total Rooms</p>
+                      <p className="text-lg font-bold text-gray-900">{hostel.totalRooms || 0}</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <p className="text-xs text-gray-500 mb-1">Capacity</p>
+                      <p className="text-lg font-bold text-gray-900">{hostel.totalCapacity}</p>
+                    </div>
+                  </div>
+
                   {/* Capacity */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-medium text-gray-500">Student Capacity</span>
+                      <span className="text-xs font-medium text-gray-500">Capacity</span>
                       <span className={`text-sm font-bold ${getOccupancyColor(occupancyPercentage)}`}>
                         {occupancyPercentage}%
                       </span>
                     </div>
                     <div className="flex items-center gap-3 mb-2">
-                      <span className="text-2xl font-bold text-gray-900">{hostel.occupied}</span>
-                      <span className="text-sm text-gray-500">/ {hostel.capacity}</span>
+                      <span className="text-2xl font-bold text-gray-900">
+                        {hostel.totalCapacity - hostel.availableCapacity}
+                      </span>
+                      <span className="text-sm text-gray-500">/ {hostel.totalCapacity}</span>
                     </div>
                     <div className="w-full bg-gray-100 rounded-full h-2">
                       <div
@@ -317,52 +334,33 @@ export default function HostelsPage() {
                     </div>
                   </div>
 
-                  {/* Room Occupancy */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-medium text-gray-500">Room Occupancy</span>
-                      <span className="text-sm font-medium text-gray-700">
-                        {hostel.occupiedRooms} / {hostel.totalRooms} rooms
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-100 rounded-full h-2">
-                      <div
-                        className="h-2 rounded-full"
-                        style={{
-                          width: `${roomOccupancyPercentage}%`,
-                          background: 'linear-gradient(90deg, #6366f1, #8b5cf6)'
-                        }}
-                      />
-                    </div>
-                  </div>
-
                   {/* Amenities */}
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 mb-2">Amenities</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {hostel.amenities.map((amenity, idx) => (
-                        <span
-                          key={idx}
-                          className="px-2 py-1 bg-gray-50 border border-gray-200 rounded text-xs text-gray-700"
-                        >
-                          {amenity}
-                        </span>
-                      ))}
+                  {hostel.amenities && (
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 mb-2">Amenities</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {hostel.amenities.split(',').map((amenity, idx) => (
+                          <span
+                            key={idx}
+                            className="px-2 py-1 bg-gray-50 border border-gray-200 rounded text-xs text-gray-700"
+                          >
+                            {amenity.trim()}
+                          </span>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* Warden Info */}
-                  <div className="pt-3 border-t border-gray-100">
-                    <p className="text-xs font-medium text-gray-500 mb-1">Warden</p>
-                    <p className="text-sm font-medium text-gray-900">{hostel.wardenName}</p>
-                    <p className="text-xs text-gray-500">{hostel.wardenPhone}</p>
-                  </div>
-
-                  {/* Address */}
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 mb-1">Address</p>
-                    <p className="text-sm text-gray-700">{hostel.address}</p>
-                  </div>
+                  {hostel.wardenName && (
+                    <div className="border-t border-gray-100 pt-3">
+                      <p className="text-xs font-medium text-gray-500 mb-1">Warden</p>
+                      <p className="text-sm font-medium text-gray-900">{hostel.wardenName}</p>
+                      {hostel.wardenPhone && (
+                        <p className="text-xs text-gray-500 mt-0.5">{hostel.wardenPhone}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -419,12 +417,12 @@ export default function HostelsPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Gender *</label>
                   <select
-                    value={formData.gender}
-                    onChange={(e) => handleChange('gender', e.target.value)}
+                    value={formData.genderType}
+                    onChange={(e) => handleChange('genderType', e.target.value)}
                     className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   >
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
+                    <option value="MALE">Male</option>
+                    <option value="FEMALE">Female</option>
                   </select>
                 </div>
 
@@ -432,48 +430,23 @@ export default function HostelsPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Total Capacity *</label>
                   <input
                     type="number"
-                    value={formData.capacity}
-                    onChange={(e) => handleChange('capacity', e.target.value)}
+                    value={formData.totalCapacity}
+                    onChange={(e) => handleChange('totalCapacity', e.target.value)}
                     placeholder="300"
                     className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Total Rooms *</label>
-                  <input
-                    type="number"
-                    value={formData.totalRooms}
-                    onChange={(e) => handleChange('totalRooms', e.target.value)}
-                    placeholder="100"
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Number of Floors *</label>
-                  <input
-                    type="number"
-                    value={formData.floors}
-                    onChange={(e) => handleChange('floors', e.target.value)}
-                    placeholder="5"
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Blocks *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Total Rooms *</label>
                 <input
-                  type="text"
-                  value={formData.blocks}
-                  onChange={(e) => handleChange('blocks', e.target.value)}
-                  placeholder="A, B, C (comma separated)"
+                  type="number"
+                  value={formData.totalRooms}
+                  onChange={(e) => handleChange('totalRooms', e.target.value)}
+                  placeholder="100"
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 />
-                <p className="text-xs text-gray-500 mt-1">Enter block names separated by commas</p>
               </div>
 
               <div>
@@ -534,7 +507,7 @@ export default function HostelsPage() {
               </button>
               <button
                 onClick={handleSave}
-                disabled={saving || !formData.name || !formData.capacity || !formData.totalRooms}
+                disabled={saving || !formData.name || !formData.totalCapacity || !formData.totalRooms}
                 className="px-4 py-2 text-sm font-semibold text-white rounded-lg transition-all cursor-pointer disabled:opacity-60 flex items-center gap-2"
                 style={{ background: 'linear-gradient(135deg, #2d5016, #4a7c2c)' }}
               >

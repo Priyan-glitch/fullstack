@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useUser } from '../../contexts/UserContext';
+import { API_BASE_URL, API_ENDPOINTS } from '../../config/api';
 import StudentLayout from '../../layouts/StudentLayout';
 
 // ─── Initial State ────────────────────────────────────────────────────────────
@@ -188,9 +190,34 @@ function ReviewItem({ label, value }) {
 
 export default function PreferencesPage() {
   const navigate = useNavigate();
+  const { user } = useUser();
   const [currentStep, setCurrentStep] = useState(1);
   const [preferences, setPreferences] = useState(initialPreferences);
   const [submitting, setSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchPreferences();
+    }
+  }, [user]);
+
+  const fetchPreferences = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.PREFERENCES_BY_STUDENT(user.id)}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data) {
+          // Merge fetched data with initial preferences to ensure all keys exist
+          setPreferences({ ...initialPreferences, ...data });
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching preferences:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const updatePreference = (key, value) => {
     setPreferences(prev => ({ ...prev, [key]: value }));
@@ -224,11 +251,24 @@ export default function PreferencesPage() {
 
   const handleSubmit = async () => {
     setSubmitting(true);
-    // TODO: API call to save preferences
-    setTimeout(() => {
+    try {
+      const payload = { ...preferences, submitted: true };
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.PREFERENCES_SAVE(user.id)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      
+      if (response.ok) {
+        navigate('/student/dashboard');
+      } else {
+        console.error('Failed to save preferences');
+      }
+    } catch (error) {
+      console.error('Error saving preferences:', error);
+    } finally {
       setSubmitting(false);
-      navigate('/student/dashboard');
-    }, 1500);
+    }
   };
 
   const formatValue = (key) => {
@@ -264,8 +304,17 @@ export default function PreferencesPage() {
           <p className="text-sm text-gray-500 mt-1">{steps[currentStep - 1].subtitle}</p>
         </div>
 
-        {/* Content */}
-        <div className="bg-white rounded-xl border border-gray-100 p-6 mb-6">
+        {isLoading ? (
+          <div className="flex justify-center p-10">
+             <svg className="animate-spin w-8 h-8 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+          </div>
+        ) : (
+          <>
+            {/* Content */}
+            <div className="bg-white rounded-xl border border-gray-100 p-6 mb-6">
 
           {/* Step 1: Room Type */}
           {currentStep === 1 && (
@@ -444,6 +493,8 @@ export default function PreferencesPage() {
             </button>
           )}
         </div>
+          </>
+        )}
 
       </div>
     </StudentLayout>
