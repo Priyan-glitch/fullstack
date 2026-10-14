@@ -120,10 +120,20 @@ function AllocationCard({ status, room, onViewRoom }) {
   );
 }
 
-function RoomPreferenceCard({ value, onEdit }) {
+function RoomPreferenceCard({ value, isSubmitted, onAction }) {
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-5 flex flex-col gap-3">
-      <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Room Preference</p>
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Room Preference</p>
+        {isSubmitted && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3">
+              <path fillRule="evenodd" d="M10 1a4.5 4.5 0 0 0-4.5 4.5V9H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-.5V5.5A4.5 4.5 0 0 0 10 1Zm3 8V5.5a3 3 0 1 0-6 0V9h6Z" clipRule="evenodd" />
+            </svg>
+            Locked
+          </span>
+        )}
+      </div>
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-semibold text-gray-900">{value}</p>
@@ -135,37 +145,62 @@ function RoomPreferenceCard({ value, onEdit }) {
           </svg>
         </div>
       </div>
-      <button
-        onClick={onEdit}
-        className="text-xs font-medium text-green-700 hover:text-green-800 text-left transition-colors cursor-pointer"
-      >
-        Edit preference →
-      </button>
+      {isSubmitted ? (
+        <div className="pt-2 border-t border-gray-50 flex items-center justify-between text-xs">
+          <span className="text-gray-400">Cannot be edited</span>
+          <button
+            onClick={onAction}
+            className="font-medium text-green-700 hover:text-green-800 transition-colors cursor-pointer"
+          >
+            View details →
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={onAction}
+          className="text-xs font-medium text-green-700 hover:text-green-800 text-left transition-colors cursor-pointer"
+        >
+          Select preference →
+        </button>
+      )}
     </div>
   );
 }
 
-function PreferenceSummaryCard({ preferences, onView }) {
+function PreferenceSummaryCard({ preferences, isSubmitted, onView }) {
   const rows = [
-    { label: 'Sleep', value: preferences.sleep },
+    { label: 'Sleep Schedule', value: preferences.sleep },
+    { label: 'Study Timing', value: preferences.studyTiming },
+    { label: 'Study Style', value: preferences.studyStyle },
     { label: 'Cleanliness', value: preferences.cleanliness },
-    { label: 'Noise', value: preferences.noise },
-    { label: 'Study', value: preferences.study },
-    { label: 'Social', value: preferences.social },
+    { label: 'Noise Preference', value: preferences.noise },
+    { label: 'Study Frequency', value: preferences.study },
+    { label: 'Social Preference', value: preferences.social },
   ];
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-5">
-      <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-4">Your Preferences</p>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Your Preferences</p>
+        {isSubmitted && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3">
+              <path fillRule="evenodd" d="M10 1a4.5 4.5 0 0 0-4.5 4.5V9H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-.5V5.5A4.5 4.5 0 0 0 10 1Zm3 8V5.5a3 3 0 1 0-6 0V9h6Z" clipRule="evenodd" />
+            </svg>
+            Submitted & Locked
+          </span>
+        )}
+      </div>
       <div className="space-y-2.5">
         {rows.map(({ label, value }) => (
           <div key={label} className="flex items-center justify-between">
-            <span className="text-sm text-gray-500 w-28 flex-shrink-0">{label}</span>
+            <span className="text-sm text-gray-500 w-36 flex-shrink-0">{label}</span>
             <span className="text-sm font-medium text-gray-800 text-right">{value}</span>
           </div>
         ))}
       </div>
-      <div className="mt-4 pt-4 border-t border-gray-50">
+      <div className="mt-4 pt-4 border-t border-gray-50 flex items-center justify-between">
+        <span className="text-xs text-gray-400">Submission is final and locked</span>
         <button
           onClick={onView}
           className="text-xs font-medium text-green-700 hover:text-green-800 transition-colors cursor-pointer"
@@ -281,7 +316,69 @@ export default function StudentDashboard() {
     fetchData();
   }, [user]);
 
-  // Map database fields to dashboard display data
+  // Helper formatters for preference values
+  const formatSleepTime = (val) => {
+    if (val === 'BEFORE_10') return 'Before 10 PM';
+    if (val === '10_TO_12') return '10 PM – 12 AM';
+    if (val === 'AFTER_12') return 'After 12 AM';
+    return val || 'Not set';
+  };
+
+  const formatNoisePref = (val) => {
+    if (val === 'VERY_QUIET') return 'Very quiet';
+    if (val === 'MODERATELY_QUIET') return 'Moderately quiet';
+    if (val === 'NO_PREFERENCE') return 'No preference';
+    if (val === 'COMFORTABLE_WITH_NOISE') return 'Comfortable with noise';
+    return val || 'Not set';
+  };
+
+  const formatStudyFreq = (val) => {
+    if (val === 'FREQUENTLY') return 'Frequently';
+    if (val === 'SOMETIMES') return 'Sometimes';
+    if (val === 'RARELY') return 'Rarely';
+    return val || 'Not set';
+  };
+
+  const formatSocialPref = (val) => {
+    if (val === 'PREFER_PRIVACY') return 'Prefers privacy';
+    if (val === 'BALANCED') return 'Balanced';
+    if (val === 'VERY_SOCIAL') return 'Very social';
+    return val || 'Not set';
+  };
+
+  const formatAcPref = (val) => {
+    if (val === 'AC') return 'AC';
+    if (val === 'NON_AC') return 'Non-AC';
+    if (val === 'BOTH') return 'AC / Non-AC (Both)';
+    return null;
+  };
+
+  const formatStudyTiming = (val) => {
+    if (val === 'MORNING_PERSON') return 'Morning Person';
+    if (val === 'NIGHT_OWL') return 'Night Owl';
+    if (val === 'FLEXIBLE') return 'Flexible / Both';
+    return val || 'Not set';
+  };
+
+  const formatStudyPref = (val) => {
+    if (val === 'ALONE') return 'Alone';
+    if (val === 'GROUP_STUDY') return 'Group study';
+    if (val === 'DOESNT_MATTER') return "Doesn't matter";
+    return val || 'Not set';
+  };
+
+  const isPrefsSubmitted = preferences?.submitted || false;
+  const roomTypeFormatted = preferences?.roomType === '2_SHARING' 
+    ? '2-Sharing' 
+    : preferences?.roomType === '3_SHARING' 
+      ? '3-Sharing' 
+      : (preferences?.roomType || 'Not Selected');
+
+  const acFormatted = formatAcPref(preferences?.acPreference);
+  const roomPrefDisplay = preferences?.roomType
+    ? `${roomTypeFormatted}${acFormatted ? ` (${acFormatted})` : ''}`
+    : 'Not Selected';
+
   const student = {
     name: user ? `${user.firstName} ${user.lastName}` : 'Student',
     rollNumber: user?.registerNumber || 'N/A',
@@ -289,8 +386,8 @@ export default function StudentDashboard() {
     email: user?.email || 'N/A',
     profileComplete: user?.profileComplete || false,
     profilePercent: user?.profileCompletionPercent || 0,
-    preferencesSubmitted: preferences?.submitted || false,
-    roomPreference: preferences?.roomType || 'Not Selected',
+    preferencesSubmitted: isPrefsSubmitted,
+    roomPreference: roomPrefDisplay,
     allocationStatus: allocation?.allocationStatus || 'not_started',
     room: allocation?.room ? {
       number: allocation.room.roomNumber,
@@ -305,13 +402,17 @@ export default function StudentDashboard() {
       }))
     } : null,
     preferences: preferences ? {
-      sleep: preferences.sleepSchedule || 'Not set',
-      cleanliness: preferences.cleanliness || 'Not set',
-      noise: preferences.noiseLevel || 'Not set',
-      study: preferences.studyTime || 'Not set',
-      social: preferences.socialPreference || 'Not set',
+      sleep: formatSleepTime(preferences.sleepTime || preferences.sleepSchedule),
+      studyTiming: formatStudyTiming(preferences.studyTiming),
+      studyStyle: formatStudyPref(preferences.studyPreference),
+      cleanliness: preferences.cleanlinessLevel ? `${preferences.cleanlinessLevel} / 5` : (preferences.cleanliness || 'Not set'),
+      noise: formatNoisePref(preferences.noisePreference || preferences.noiseLevel),
+      study: formatStudyFreq(preferences.studyFrequency || preferences.studyTime),
+      social: formatSocialPref(preferences.socialPreference),
     } : {
       sleep: 'Not set',
+      studyTiming: 'Not set',
+      studyStyle: 'Not set',
       cleanliness: 'Not set',
       noise: 'Not set',
       study: 'Not set',
@@ -319,7 +420,7 @@ export default function StudentDashboard() {
     },
     recentActivity: [
       { label: 'Profile completed', date: user?.createdAt ? new Date(user.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A' },
-      ...(preferences?.submittedAt ? [{ label: 'Preferences submitted', date: new Date(preferences.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) }] : []),
+      ...(preferences?.submittedAt || preferences?.createdAt ? [{ label: 'Preferences submitted (Locked)', date: new Date(preferences.submittedAt || preferences.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) }] : []),
       ...(allocation?.allocatedAt ? [{ label: 'Room allocated', date: new Date(allocation.allocatedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) }] : []),
     ],
   };
@@ -336,9 +437,9 @@ export default function StudentDashboard() {
     },
     {
       title: 'Preferences',
-      value: student.preferencesSubmitted ? 'Submitted' : 'Not Submitted',
+      value: student.preferencesSubmitted ? 'Submitted (Locked)' : 'Not Submitted',
       state: student.preferencesSubmitted ? 'success' : 'warning',
-      action: student.preferencesSubmitted ? null : 'Complete now',
+      action: student.preferencesSubmitted ? 'View preferences' : 'Complete now',
       onAction: () => navigate('/student/preferences'),
     },
     {
@@ -408,6 +509,7 @@ export default function StudentDashboard() {
               {student.preferencesSubmitted && (
                 <PreferenceSummaryCard
                   preferences={student.preferences}
+                  isSubmitted={student.preferencesSubmitted}
                   onView={() => navigate('/student/preferences')}
                 />
               )}
@@ -417,7 +519,8 @@ export default function StudentDashboard() {
             <div className="space-y-6">
               <RoomPreferenceCard
                 value={student.roomPreference}
-                onEdit={() => navigate('/student/preferences')}
+                isSubmitted={student.preferencesSubmitted}
+                onAction={() => navigate('/student/preferences')}
               />
 
               <RecentActivity activity={student.recentActivity} />

@@ -55,8 +55,10 @@ public class StudentController {
     }
 
     @GetMapping("/search")
-    public ResponseEntity<List<StudentDTO>> searchStudents(@RequestParam String query) {
-        return ResponseEntity.ok(studentService.searchStudents(query));
+    public ResponseEntity<List<StudentDTO>> searchStudents(
+            @RequestParam String query,
+            @RequestParam(required = false) String gender) {
+        return ResponseEntity.ok(studentService.searchStudents(query, gender));
     }
 
     @GetMapping("/departments")

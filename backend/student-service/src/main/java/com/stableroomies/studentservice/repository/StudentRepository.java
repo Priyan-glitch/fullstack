@@ -48,4 +48,8 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
     Long countActiveStudents();
     
     Long countByActive(Boolean active);
+
+    Long countByRoomNumberIsNotNull();
+
+    List<Student> findByRoomNumber(String roomNumber);
 }

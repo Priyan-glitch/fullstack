@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/preferences")
@@ -27,23 +28,29 @@ public class StudentPreferenceController {
 
     // Create new preferences
     @PostMapping
-    public ResponseEntity<StudentPreferenceDTO> createPreferences(@RequestBody StudentPreferenceDTO dto) {
+    public ResponseEntity<?> createPreferences(@RequestBody StudentPreferenceDTO dto) {
         try {
             StudentPreferenceDTO created = preferenceService.createPreferences(dto);
             return ResponseEntity.status(HttpStatus.CREATED).body(created);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 
     // Update preferences
     @PutMapping("/student/{studentId}")
-    public ResponseEntity<StudentPreferenceDTO> updatePreferences(
+    public ResponseEntity<?> updatePreferences(
             @PathVariable Long studentId,
             @RequestBody StudentPreferenceDTO dto) {
         try {
             StudentPreferenceDTO updated = preferenceService.updatePreferences(studentId, dto);
             return ResponseEntity.ok(updated);
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -51,12 +58,18 @@ public class StudentPreferenceController {
 
     // Save or update preferences (upsert)
     @PostMapping("/student/{studentId}")
-    public ResponseEntity<StudentPreferenceDTO> saveOrUpdatePreferences(
+    public ResponseEntity<?> saveOrUpdatePreferences(
             @PathVariable Long studentId,
             @RequestBody StudentPreferenceDTO dto) {
-        dto.setStudentId(studentId); // Ensure student ID matches path
-        StudentPreferenceDTO result = preferenceService.saveOrUpdatePreferences(dto);
-        return ResponseEntity.ok(result);
+        try {
+            dto.setStudentId(studentId); // Ensure student ID matches path
+            StudentPreferenceDTO result = preferenceService.saveOrUpdatePreferences(dto);
+            return ResponseEntity.ok(result);
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 
     // Delete preferences
@@ -75,6 +88,12 @@ public class StudentPreferenceController {
     public ResponseEntity<Boolean> hasPreferences(@PathVariable Long studentId) {
         boolean exists = preferenceService.hasPreferences(studentId);
         return ResponseEntity.ok(exists);
+    }
+
+    // Get all submitted preferences — used by algorithm-engine
+    @GetMapping("/submitted")
+    public ResponseEntity<List<StudentPreferenceDTO>> getAllSubmittedPreferences() {
+        return ResponseEntity.ok(preferenceService.getAllSubmittedPreferences());
     }
 
     @ExceptionHandler(RuntimeException.class)

@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useUser } from '../../contexts/UserContext';
+import { ALLOCATION_API_BASE_URL, API_ENDPOINTS } from '../../config/api';
 import StudentLayout from '../../layouts/StudentLayout';
 
 // Simple icon components as replacements
@@ -34,33 +36,43 @@ const InformationCircleIcon = ({ className }) => (
 );
 
 export default function AllocationPage() {
-  // Simulate allocation status - in real app, fetch from API
-  // States: 'not_allocated', 'in_progress', 'allocated'
-  const [allocationStatus] = useState('not_allocated');
-  
-  // Mock allocation data - in real app, fetch from backend
-  const [allocationData] = useState({
-    roomNumber: '204',
-    roomType: '3-Sharing',
-    building: 'A Block',
-    floor: '2nd Floor',
-    roommates: [
-      {
-        id: 1,
-        name: 'Priya Sharma',
-        department: 'Computer Science',
-        year: 3,
-        avatar: null
-      },
-      {
-        id: 2,
-        name: 'Ananya Reddy',
-        department: 'Information Technology',
-        year: 3,
-        avatar: null
+  const { user } = useUser();
+  const [allocationStatus, setAllocationStatus] = useState('not_allocated');
+  const [allocationData, setAllocationData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const fetchAllocation = async () => {
+      try {
+        setLoading(true);
+        const res = await fetch(`${ALLOCATION_API_BASE_URL}${API_ENDPOINTS.ALLOCATION_BY_STUDENT(user.id)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.allocationStatus === 'allocated' && data.room) {
+            setAllocationStatus('allocated');
+            setAllocationData({
+              roomNumber: data.room.roomNumber,
+              roomType: data.room.roomType || '2-Sharing',
+              building: data.room.hostelName || data.room.block || 'Main Block',
+              floor: data.room.floor || '1st Floor',
+              roommates: data.roommates || [],
+            });
+          } else {
+            setAllocationStatus('not_allocated');
+          }
+        } else {
+          setAllocationStatus('not_allocated');
+        }
+      } catch (err) {
+        console.error('Failed to fetch allocation:', err);
+        setAllocationStatus('not_allocated');
+      } finally {
+        setLoading(false);
       }
-    ]
-  });
+    };
+    fetchAllocation();
+  }, [user?.id]);
 
   const getInitials = (name) => {
     return name

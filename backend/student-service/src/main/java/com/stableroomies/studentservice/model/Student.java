@@ -88,6 +88,12 @@ public class Student {
     @Column(nullable = false)
     private Integer profileCompletionPercent = 0;
 
+    @Column(length = 20)
+    private String roomNumber;
+
+    @Column(length = 50)
+    private String hostelBlock;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -326,6 +332,22 @@ public class Student {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public String getRoomNumber() {
+        return roomNumber;
+    }
+
+    public void setRoomNumber(String roomNumber) {
+        this.roomNumber = roomNumber;
+    }
+
+    public String getHostelBlock() {
+        return hostelBlock;
+    }
+
+    public void setHostelBlock(String hostelBlock) {
+        this.hostelBlock = hostelBlock;
     }
 
     // Helper method to get full name

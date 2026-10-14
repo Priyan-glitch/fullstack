@@ -64,7 +64,12 @@ public class StudentService {
     }
 
     public List<StudentDTO> searchStudents(String searchTerm) {
+        return searchStudents(searchTerm, null);
+    }
+
+    public List<StudentDTO> searchStudents(String searchTerm, String gender) {
         return studentRepository.searchStudents(searchTerm).stream()
+                .filter(s -> gender == null || gender.isBlank() || (s.getGender() != null && s.getGender().equalsIgnoreCase(gender.trim())))
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
@@ -142,6 +147,8 @@ public class StudentService {
         dto.setActive(student.getActive());
         dto.setProfileComplete(student.getProfileComplete());
         dto.setProfileCompletionPercent(student.getProfileCompletionPercent());
+        dto.setRoomNumber(student.getRoomNumber());
+        dto.setHostelBlock(student.getHostelBlock());
         dto.setCreatedAt(student.getCreatedAt());
         dto.setUpdatedAt(student.getUpdatedAt());
         return dto;
@@ -170,6 +177,8 @@ public class StudentService {
         student.setGuardianRelation(dto.getGuardianRelation());
         student.setEmergencyContact(dto.getEmergencyContact());
         student.setActive(dto.getActive() != null ? dto.getActive() : true);
+        student.setRoomNumber(dto.getRoomNumber());
+        student.setHostelBlock(dto.getHostelBlock());
         return student;
     }
 
@@ -188,6 +197,8 @@ public class StudentService {
         if (dto.getGuardianPhone() != null) student.setGuardianPhone(dto.getGuardianPhone());
         if (dto.getGuardianRelation() != null) student.setGuardianRelation(dto.getGuardianRelation());
         if (dto.getEmergencyContact() != null) student.setEmergencyContact(dto.getEmergencyContact());
+        if (dto.getRoomNumber() != null) student.setRoomNumber(dto.getRoomNumber());
+        if (dto.getHostelBlock() != null) student.setHostelBlock(dto.getHostelBlock());
     }
 
     private Integer calculateProfileCompletion(Student student) {
@@ -232,10 +243,8 @@ public class StudentService {
         Long active = studentRepository.countByActive(true);
         Long inactive = studentRepository.countByActive(false);
 
-        // Allocation stats will be fetched from allocation-service in future
-        // For now, return 0 for allocated and total for pending
-        Long allocated = 0L;
-        Long pending = total;
+        Long allocated = studentRepository.countByRoomNumberIsNotNull();
+        Long pending = total - allocated;
 
         // Count room sharing preferences
         Long twoSharing = preferenceRepository.countByRoomType("2_SHARING");

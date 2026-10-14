@@ -28,6 +28,8 @@ public class StudentDTO {
     private Boolean active;
     private Boolean profileComplete;
     private Integer profileCompletionPercent;
+    private String roomNumber;
+    private String hostelBlock;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -242,5 +244,21 @@ public class StudentDTO {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public String getRoomNumber() {
+        return roomNumber;
+    }
+
+    public void setRoomNumber(String roomNumber) {
+        this.roomNumber = roomNumber;
+    }
+
+    public String getHostelBlock() {
+        return hostelBlock;
+    }
+
+    public void setHostelBlock(String hostelBlock) {
+        this.hostelBlock = hostelBlock;
     }
 }

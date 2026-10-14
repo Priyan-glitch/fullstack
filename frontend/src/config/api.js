@@ -1,7 +1,9 @@
 // API Configuration
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081';
 export const HOSTEL_API_BASE_URL = import.meta.env.VITE_HOSTEL_API_BASE_URL || 'http://localhost:8082';
-export const ALLOCATION_API_BASE_URL = import.meta.env.VITE_ALLOCATION_API_BASE_URL || 'http://localhost:8083';
+export const ALGORITHM_API_BASE_URL = import.meta.env.VITE_ALGORITHM_API_BASE_URL || 'http://localhost:8090';
+// Alias kept for backward-compat with files that still import the old name
+export const ALLOCATION_API_BASE_URL = API_BASE_URL;
 
 export const API_ENDPOINTS = {
   // Auth
@@ -25,11 +27,19 @@ export const API_ENDPOINTS = {
   PREFERENCES_SAVE: (studentId) => `/api/preferences/student/${studentId}`,
   PREFERENCES_EXISTS: (studentId) => `/api/preferences/student/${studentId}/exists`,
   
-  // Allocations
+  // Student-service allocation (student-facing)
   ALLOCATION_BY_STUDENT: (studentId) => `/api/allocations/student/${studentId}`,
   ALLOCATION_ROOMMATES: (studentId) => `/api/allocations/student/${studentId}/roommates`,
   ALLOCATION_TRIGGER: '/api/allocations/trigger',
   ALLOCATION_SAMPLE: (studentId) => `/api/allocations/student/${studentId}/sample`,
+
+  // Algorithm Engine (admin-facing, port 8090)
+  ALGO_STRATEGIES: '/api/v1/allocation/strategies',
+  ALGO_RUN: '/api/v1/allocation/run',
+  ALGO_RUNS: '/api/v1/allocation/runs',
+  ALGO_RUN_BY_ID: (id) => `/api/v1/allocation/runs/${id}`,
+  ALGO_APPROVE: (id) => `/api/v1/allocation/runs/${id}/approve`,
+  ALGO_REJECT: (id) => `/api/v1/allocation/runs/${id}/reject`,
   
   // Hostels
   HOSTELS: '/api/hostels',
