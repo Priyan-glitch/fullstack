@@ -84,9 +84,37 @@ This will open separate terminal windows for:
 
 ### 1. Infrastructure (Postgres, Redis, RabbitMQ)
 
+Each service owns its own Postgres instance, so there is no single `postgres`
+service to start — list them explicitly (or omit the names to start everything):
+
 ```bash
-docker compose -f infrastructure/docker/docker-compose.yml up -d postgres redis rabbitmq
+docker compose -f infrastructure/docker/docker-compose.yml up -d \
+  postgres-student postgres-hostel postgres-allocation postgres-notification \
+  postgres-algorithm redis rabbitmq
 ```
+
+Host ports: `postgres-student` 5432, `postgres-hostel` 5433,
+`postgres-allocation` 5434, `postgres-notification` 5435,
+`postgres-algorithm` 5436, Redis 6379, RabbitMQ 5672 (UI 15672).
+
+> **Port 5432 conflicts.** If you already run Postgres natively (for example via
+> Homebrew), `postgres-student` will fail to bind 5432. Either stop the local
+> instance, or map the container elsewhere and point student-service at it —
+> Spring Boot reads `SPRING_DATASOURCE_URL` from the environment, which
+> overrides `application.yml`:
+>
+> ```bash
+> # docker-compose.override.yml (machine-local, do not commit)
+> services:
+>   postgres-student:
+>     ports:
+>       - "5437:5432"
+> ```
+>
+> ```bash
+> cd backend/student-service
+> SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5437/student_db mvn spring-boot:run
+> ```
 
 ### 2. Backend services (each in a separate terminal)
 

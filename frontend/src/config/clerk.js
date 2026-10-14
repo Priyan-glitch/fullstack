@@ -55,14 +55,17 @@ const ADMIN_ROLE_ALIASES = new Set(['admin', 'warden', 'staff', 'administrator']
  *
  * Order of precedence:
  *   1. `publicMetadata.role`  (set from the Clerk dashboard / Backend API)
- *   2. `unsafeMetadata.role`  (self-assigned at sign-up)
- *   3. `VITE_ADMIN_EMAILS`    (local development escape hatch)
- *   4. `student`              (default)
+ *   2. `VITE_ADMIN_EMAILS`    (local development escape hatch)
+ *   3. `student`              (default)
+ *
+ * `unsafeMetadata` is deliberately NOT consulted: it is writable by the
+ * signed-in user from the browser, so trusting it would let anyone grant
+ * themselves the admin role.
  */
 export function resolveRole(clerkUser) {
   if (!clerkUser) return null;
 
-  const declared = clerkUser.publicMetadata?.role ?? clerkUser.unsafeMetadata?.role;
+  const declared = clerkUser.publicMetadata?.role;
   if (typeof declared === 'string') {
     const normalised = declared.trim().toLowerCase();
     if (ADMIN_ROLE_ALIASES.has(normalised)) return 'admin';

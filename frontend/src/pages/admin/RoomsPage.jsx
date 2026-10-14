@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import AdminLayout from '../../layouts/AdminLayout';
 import { HOSTEL_API_BASE_URL, API_ENDPOINTS } from '../../config/api';
+import { percentLabel } from '../../utils/number';
 
 // Simple icon components
 const HomeIcon = ({ className }) => (
@@ -354,7 +355,7 @@ export default function RoomsPage() {
           <div className="bg-white rounded-xl border border-emerald-100 p-4">
             <p className="text-xs text-gray-500 mb-1">Occupancy</p>
             <p className="text-2xl font-bold text-emerald-600">
-              {Math.round((stats.totalOccupied / stats.totalCapacity) * 100)}%
+              {percentLabel(stats.totalOccupied, stats.totalCapacity) ?? '—'}
             </p>
           </div>
         </div>

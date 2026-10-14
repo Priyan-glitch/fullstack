@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import AdminLayout from '../../layouts/AdminLayout';
 import { API_BASE_URL, HOSTEL_API_BASE_URL, API_ENDPOINTS } from '../../config/api';
+import { percentLabel } from '../../utils/number';
 
 // Simple icon components
 const UsersIcon = ({ className }) => (
@@ -83,12 +84,18 @@ export default function AdminDashboard() {
       setLoading(true);
       setError(null);
 
-      // Fetch student stats
+      // Fetch student stats (student-service :8081)
       const studentResponse = await fetch(`${API_BASE_URL}${API_ENDPOINTS.ADMIN_STATS}`);
+      if (!studentResponse.ok) {
+        throw new Error(`student-service responded with ${studentResponse.status}`);
+      }
       const studentData = await studentResponse.json();
 
-      // Fetch hostel/room stats
+      // Fetch hostel/room stats (hostel-service :8082)
       const hostelResponse = await fetch(`${HOSTEL_API_BASE_URL}${API_ENDPOINTS.HOSTEL_STATS}`);
+      if (!hostelResponse.ok) {
+        throw new Error(`hostel-service responded with ${hostelResponse.status}`);
+      }
       const hostelData = await hostelResponse.json();
 
       setStats({
@@ -103,7 +110,12 @@ export default function AdminDashboard() {
       });
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
-      setError('Failed to load dashboard data');
+      // A TypeError means fetch never reached a server at all.
+      setError(
+        err instanceof TypeError
+          ? 'Cannot reach the backend services. Start student-service (:8081) and hostel-service (:8082), then press Refresh.'
+          : `Failed to load dashboard data — ${err.message}`,
+      );
     } finally {
       setLoading(false);
     }
@@ -156,6 +168,10 @@ export default function AdminDashboard() {
     );
   };
 
+  const allocatedPercent = percentLabel(stats.allocatedStudents, stats.totalStudents, 'of total');
+  const pendingPercent = percentLabel(stats.pendingAllocation, stats.totalStudents, 'remaining');
+  const vacantPercent = percentLabel(stats.availableRooms, stats.totalRooms, 'vacant');
+
   return (
     <AdminLayout>
       <div className="max-w-6xl mx-auto">
@@ -176,8 +192,23 @@ export default function AdminDashboard() {
         </div>
 
         {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-            {error}
+          <div className="mb-6 flex items-start gap-3 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+              stroke="currentColor"
+              className="w-5 h-5 flex-shrink-0 mt-0.5"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z"
+              />
+            </svg>
+            <span className="text-sm">{error}</span>
           </div>
         )}
 
@@ -195,14 +226,14 @@ export default function AdminDashboard() {
               <StatCard
                 title="Allocated Students"
                 value={stats.allocatedStudents}
-                subtitle={`${Math.round((stats.allocatedStudents / stats.totalStudents) * 100)}% of total`}
+                subtitle={allocatedPercent}
                 icon={ClipboardCheckIcon}
                 color="green"
               />
               <StatCard
                 title="Pending Allocation"
                 value={stats.pendingAllocation}
-                subtitle={`${Math.round((stats.pendingAllocation / stats.totalStudents) * 100)}% remaining`}
+                subtitle={pendingPercent}
                 icon={ClockIcon}
                 color="amber"
               />
@@ -222,7 +253,7 @@ export default function AdminDashboard() {
               <StatCard
                 title="Available Rooms"
                 value={stats.availableRooms}
-                subtitle={`${Math.round((stats.availableRooms / stats.totalRooms) * 100)}% vacant`}
+                subtitle={vacantPercent}
                 icon={HomeIcon}
                 color="gray"
               />
