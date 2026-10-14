@@ -207,6 +207,30 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  # ── Auth Service ──────────────────────────────────────────────────────────────
+
+  auth-service:
+    build:
+      context: ../../backend/auth-service
+      dockerfile: Dockerfile
+    container_name: stable-roomies-auth-service
+    ports:
+      - "8085:8085"
+    env_file:
+      # Supplies JWT_SECRET, plus the optional AUTH_ADMIN_* bootstrap values.
+      - path: ../../.env
+        required: false
+    environment:
+      SPRING_APPLICATION_NAME: auth-service
+      # Local dev reuses the student database; a hosted deployment points every
+      # service at one shared database through .env instead.
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-student:5432/student_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+    depends_on:
+      postgres-student:
+        condition: service_healthy
+
   # ── Algorithm Engine ──────────────────────────────────────────────────────────
 
   algorithm-engine:
@@ -256,10 +280,12 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    env_file:
+      # Supplies JWT_SECRET. Optional, so a fresh clone still starts — the gateway
+      # and auth-service then fall back to the same repository-level dev key.
+      - path: ../../.env
+        required: false
     environment:
-      # Repoint these at a production Clerk instance when deploying.
-      CLERK_ISSUER: ${CLERK_ISSUER:-https://exciting-zebra-1231.clerk.accounts.dev}
-      CLERK_JWKS_URL: ${CLERK_JWKS_URL:-https://exciting-zebra-1231.clerk.accounts.dev/.well-known/jwks.json}
       # Only needed for the Vite dev server; same-origin in production.
       CORS_ALLOW_ORIGIN: ${CORS_ALLOW_ORIGIN:-http://localhost:5174}
     volumes:
@@ -268,6 +294,7 @@ services:
       - caddy_config:/config
     depends_on:
       - frontend
+      - auth-service
       - student-service
       - hostel-service
       - allocation-service

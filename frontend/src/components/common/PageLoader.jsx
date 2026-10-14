@@ -1,6 +1,6 @@
 import BrandMark from './BrandMark';
 
-/** Full-viewport brand splash shown while Clerk resolves the session. */
+/** Full-viewport brand splash shown while the stored session is resolved. */
 export default function PageLoader({ label = 'Loading your workspace…' }) {
   return (
     <div

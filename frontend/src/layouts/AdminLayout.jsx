@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { UserButton } from '@clerk/react';
+import SignOutButton from '../components/common/SignOutButton';
 import { useUser } from '../contexts/UserContext';
 import BrandMark from '../components/common/BrandMark';
 import NotificationBell from '../components/NotificationBell';
@@ -93,7 +93,7 @@ export default function AdminLayout({ children }) {
         {/* Spacer */}
         <div className="flex-1" />
 
-        {/* Right side — notifications + signed-in identity + Clerk account menu */}
+        {/* Right side — notifications + signed-in identity + sign out */}
         <div className="flex items-center gap-2">
           {/* Real-time Notification Bell */}
           <NotificationBell />
@@ -105,7 +105,7 @@ export default function AdminLayout({ children }) {
               </span>
               <span className="text-[11px] text-gray-400">Warden</span>
             </div>
-            <UserButton />
+            <SignOutButton />
           </div>
         </div>
       </header>

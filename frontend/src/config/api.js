@@ -3,8 +3,8 @@ import { apiFetch } from '../lib/http';
 // API Configuration
 //
 // Every API call goes through the gateway (gateway/Caddyfile), which verifies
-// the Clerk session token before proxying to a service. One origin for all
-// services, so CORS is a single relationship instead of five.
+// the JWT issued by auth-service before proxying to a service. One origin for
+// all services, so CORS is a single relationship instead of five.
 //
 // The per-service env vars are kept so you can bypass the gateway while
 // developing a single service — set e.g. VITE_API_BASE_URL=http://localhost:8081
@@ -20,8 +20,12 @@ export const ALGORITHM_API_BASE_URL = import.meta.env.VITE_ALGORITHM_API_BASE_UR
 export const ALLOCATION_API_BASE_URL = API_BASE_URL;
 
 export const API_ENDPOINTS = {
-  // Auth
-  LOGIN: '/api/students/login',
+  // Authentication (auth-service, via the gateway).
+  // login/register are the only endpoints the gateway lets through without a
+  // token; /me requires one.
+  AUTH_LOGIN: '/api/auth/login',
+  AUTH_REGISTER: '/api/auth/register',
+  AUTH_ME: '/api/auth/me',
   
   // Admin Dashboard
   ADMIN_STATS: '/api/students/admin/stats',

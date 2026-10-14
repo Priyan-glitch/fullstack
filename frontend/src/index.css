@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 /* ── Design tokens ─────────────────────────────────────────────────────────── */
-/* Brand scale mirrors BRAND in src/config/clerk.js so the app chrome and the
-   Clerk components stay on the same palette. */
+/* Brand scale used by the app chrome — the auth screens and the gateway-era
+   sign-in forms all draw from these tokens. */
 @theme {
   --color-brand-50: #f2f7ee;
   --color-brand-100: #e3eeda;

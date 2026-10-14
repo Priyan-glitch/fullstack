@@ -1,19 +1,9 @@
-import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
-import { ClerkProvider } from '@clerk/react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 
 import { UserProvider } from './contexts/UserContext';
 import { NotificationProvider } from './contexts/NotificationContext';
-import {
-  CLERK_PUBLISHABLE_KEY,
-  clerkUi,
-  clerkAppearance,
-  clerkLocalization,
-  AUTH_ROUTES,
-} from './config/clerk';
 
 import { ProtectedRoute, GuestOnly, RoleRedirect } from './components/auth/RouteGuards';
-import ApiAuthBridge from './components/auth/ApiAuthBridge';
-import BrandMark from './components/common/BrandMark';
 
 import StudentLayout from './layouts/StudentLayout';
 import AdminLayout from './layouts/AdminLayout';
@@ -34,52 +24,11 @@ import HostelsPage from './pages/admin/HostelsPage';
 import RoomsPage from './pages/admin/RoomsPage';
 import AdminAllocationPage from './pages/admin/AllocationPage';
 
-/** Shown when the build has no Clerk publishable key configured. */
-function MissingClerkKey() {
-  return (
-    <div className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-[#fbfcfb] px-6 py-16 text-center">
-      <BrandMark size="lg" />
-      <div className="max-w-lg">
-        <h1 className="text-xl font-bold tracking-tight text-gray-900">
-          Clerk is not configured
-        </h1>
-        <p className="mt-3 text-sm leading-relaxed text-gray-500">
-          Add your publishable key to{' '}
-          <code className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-700">
-            frontend/.env.local
-          </code>{' '}
-          and restart the dev server:
-        </p>
-        <pre className="mt-4 overflow-x-auto rounded-lg bg-gray-900 px-4 py-3 text-left text-xs text-gray-100">
-          VITE_CLERK_PUBLISHABLE_KEY=pk_test_…
-        </pre>
-      </div>
-    </div>
-  );
-}
-
 function AppRoutes() {
-  const navigate = useNavigate();
-
   return (
-    <ClerkProvider
-      publishableKey={CLERK_PUBLISHABLE_KEY}
-      ui={clerkUi}
-      routerPush={(to) => navigate(to)}
-      routerReplace={(to) => navigate(to, { replace: true })}
-      signInUrl={AUTH_ROUTES.signIn}
-      signUpUrl={AUTH_ROUTES.signUp}
-      afterSignOutUrl={AUTH_ROUTES.afterSignOut}
-      signInFallbackRedirectUrl="/"
-      signUpFallbackRedirectUrl="/"
-      appearance={clerkAppearance}
-      localization={clerkLocalization}
-    >
-      <UserProvider>
-        {/* Hands Clerk's getToken to the non-React API helper in lib/http.js */}
-        <ApiAuthBridge />
-        <NotificationProvider>
-          <Routes>
+    <UserProvider>
+      <NotificationProvider>
+        <Routes>
             {/* Entry point — routes each visitor by session + role */}
             <Route path="/" element={<RoleRedirect />} />
 
@@ -222,17 +171,12 @@ function AppRoutes() {
 
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
-        </NotificationProvider>
-      </UserProvider>
-    </ClerkProvider>
+      </NotificationProvider>
+    </UserProvider>
   );
 }
 
 export default function App() {
-  if (!CLERK_PUBLISHABLE_KEY) {
-    return <MissingClerkKey />;
-  }
-
   return (
     <BrowserRouter>
       <AppRoutes />

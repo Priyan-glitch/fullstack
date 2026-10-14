@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import BrandMark from '../components/common/BrandMark';
 import { useUser } from '../contexts/UserContext';
-import { AUTH_ROUTES, STUDENT_HOME, ADMIN_HOME } from '../config/clerk';
+import { AUTH_ROUTES, STUDENT_HOME, ADMIN_HOME } from '../config/auth';
 
 export default function NotFoundPage() {
   const { isAuthenticated, isAdmin } = useUser();

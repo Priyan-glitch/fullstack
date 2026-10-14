@@ -65,7 +65,7 @@ function PanelBackdrop() {
 
 /**
  * Split-screen shell for the sign-in and sign-up screens.
- * Desktop: brand story on the left, Clerk component on the right.
+ * Desktop: brand story on the left, sign-in form on the right.
  * Mobile: a compact brand band above the form.
  */
 export default function AuthLayout({ children }) {
@@ -144,7 +144,7 @@ export default function AuthLayout({ children }) {
                 d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z"
               />
             </svg>
-            Secured by Clerk
+            Secured by JWT authentication
           </span>
         </div>
       </aside>
@@ -164,7 +164,7 @@ export default function AuthLayout({ children }) {
         </main>
 
         <footer className="lg:hidden px-5 pb-7 text-center text-xs text-gray-400 sm:px-8">
-          © {year} Stable Roomies · Secured by Clerk
+          © {year} Stable Roomies · Secured by JWT authentication
         </footer>
       </div>
     </div>

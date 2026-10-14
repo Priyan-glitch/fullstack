@@ -1,47 +1,45 @@
 /**
  * Authenticated fetch for the API gateway.
  *
- * The gateway rejects any request under /api/* without a valid Clerk session
- * token, so every API call must carry `Authorization: Bearer <token>`.
- * Clerk exposes getToken() only through a React hook, but a lot of the fetch
- * calls in this app live in plain helper functions, so the hook hands its
- * getToken here once (see ApiAuthBridge) and apiFetch reads it from module
- * scope. That avoids threading the token through every call site's props.
+ * The gateway rejects any request under /api/* without a valid JWT, so every API
+ * call must carry `Authorization: Bearer <token>`. The token lives in
+ * lib/authToken, which is plain module state rather than a React hook — many
+ * fetch calls in this app sit in helper functions that cannot call hooks, so
+ * reading from module scope keeps the token out of every call site's props.
  */
 
-let tokenGetter = null;
+import { getToken } from './authToken';
 
-/** Called by ApiAuthBridge with Clerk's getToken. */
-export function setAuthTokenGetter(getter) {
-  tokenGetter = typeof getter === 'function' ? getter : null;
-}
+let unauthorizedHandler = null;
 
-async function authorizationHeader() {
-  if (!tokenGetter) return null;
-
-  try {
-    const token = await tokenGetter();
-    return token ? `Bearer ${token}` : null;
-  } catch (error) {
-    // A failure here means Clerk has no usable session; let the request go
-    // through untokenised so the gateway answers 401 and the UI shows a
-    // sign-in prompt rather than a network error.
-    console.warn('Could not read Clerk session token:', error);
-    return null;
-  }
+/**
+ * Registers what to do when the gateway rejects the token — normally signing the
+ * user out. Optional; without it a 401 just surfaces to the caller.
+ */
+export function onUnauthorized(handler) {
+  unauthorizedHandler = typeof handler === 'function' ? handler : null;
 }
 
 /**
- * Drop-in replacement for window.fetch that attaches the Clerk session token.
+ * Drop-in replacement for window.fetch that attaches the JWT.
  * An explicit Authorization header is never overwritten.
  */
 export async function apiFetch(input, init = {}) {
   const headers = new Headers(init.headers || {});
-  const authorization = await authorizationHeader();
+  const token = getToken();
 
-  if (authorization && !headers.has('Authorization')) {
-    headers.set('Authorization', authorization);
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
   }
 
-  return fetch(input, { ...init, headers });
+  const response = await fetch(input, { ...init, headers });
+
+  // 401 means the token was absent, expired or rejected. Notifying lets the app
+  // drop the stale session and show the sign-in screen instead of a bare error.
+  // 403 is deliberately excluded: that is a permissions answer, not a session one.
+  if (response.status === 401 && unauthorizedHandler) {
+    unauthorizedHandler();
+  }
+
+  return response;
 }

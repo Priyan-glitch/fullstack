@@ -39,7 +39,7 @@ Infrastructure (shared by all services)
 | Frontend | React 19 + Tailwind CSS (Vite) |
 | Backend | Spring Boot 3.3 / Java 21 |
 | Algorithm Engine | Python 3.11 / FastAPI |
-| Auth | Clerk |
+| Auth | JWT (self-hosted auth-service) |
 | API Gateway | Caddy 2 |
 | Database | PostgreSQL 17 |
 | Cache / Rate Limiting | Redis 7 |
@@ -118,7 +118,13 @@ Host ports: `postgres-student` 5432, `postgres-hostel` 5433,
 
 ### 2. Backend services (each in a separate terminal)
 
+Start auth-service first — the gateway forwards every `/api/*` request to a
+backend and has nothing to verify tokens against until it is up.
+
 ```bash
+cd backend/auth-service
+mvn spring-boot:run
+
 cd backend/student-service
 mvn spring-boot:run
 
@@ -198,86 +204,90 @@ Supabase), change only `.env`; no code or YAML edits are needed.
 
 ---
 
-## Authentication (Clerk)
+## Authentication (auth-service)
 
-Authentication is handled entirely by Clerk on the frontend. The React app never
-sees a password; it only ever reads the signed-in identity and the application
-role derived from it.
+Authentication is self-hosted: [`backend/auth-service`](backend/auth-service) issues
+the JWTs and the gateway verifies them. The frontend never sends a password
+anywhere except `POST /api/auth/login`, and stores nothing but the returned token.
 
-### 1. Configure the publishable key
+### 1. How a session works
+
+| Step | Where | What happens |
+|---|---|---|
+| 1 | `/login` | Form posts email + password to `/api/auth/login` |
+| 2 | auth-service | Verifies the BCrypt hash, signs an HS256 JWT (24h) |
+| 3 | Browser | Stores the token in `localStorage` ([`lib/authToken.js`](frontend/src/lib/authToken.js)) |
+| 4 | Every call | `apiFetch` attaches `Authorization: Bearer <token>` |
+| 5 | Gateway | Verifies signature, issuer and expiry before proxying |
+| 6 | On load | `UserContext` re-checks the token against `/api/auth/me` |
+
+Step 6 matters: the token is only trusted once `/me` confirms it, so a revoked or
+stale session cannot survive a page load.
+
+### 2. The signing key
+
+`JWT_SECRET` must be **base64-encoded** and identical on both sides — caddy-jwt
+decodes `sign_key` as base64 and `JwtService` decodes it the same way, so they
+derive the same key. Put it in the gitignored `.env` at the repository root:
 
 ```bash
-cd frontend
-cp .env.example .env.local     # then paste your key
+openssl rand -base64 32        # → JWT_SECRET=<paste here>
 ```
 
-```bash
-VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
-```
+A mismatched or non-base64 key is the most likely cause of a blanket `401`. The
+gateway refuses to start on a malformed key; auth-service fails at startup when
+the value does not decode to at least 32 bytes.
 
-Get it from the Clerk dashboard → **Configure → API keys**. Publishable keys are
-safe to expose (they ship inside the client bundle); the **secret key must never**
-be placed in `frontend/`.
+> A **development-only** default ships in both configs so a fresh clone runs with
+> no setup. It is in the repository and therefore public — override before deploying.
 
-### 2. Routes
+### 3. Routes
 
 | Route | Access | Behaviour |
 |---|---|---|
 | `/` | public | Sends visitors to their role home, or to `/login` |
-| `/login`, `/signup` | signed out | Clerk components; redirects signed-in users away |
+| `/login`, `/signup` | signed out | Real forms; redirects signed-in users away |
 | `/student/*` | `student` | Redirects wardens to `/admin/dashboard` |
 | `/admin/*` | `admin` | Redirects students to `/student/dashboard` |
 | anything else | public | Branded 404 |
 
-Guarding lives in [`frontend/src/components/auth/RouteGuards.jsx`](frontend/src/components/auth/RouteGuards.jsx).
-Hitting a protected route while signed out sends you to
-`/login?redirect_url=…`, so Clerk returns you to the page you wanted after sign-in.
+Guarding lives in [`RouteGuards.jsx`](frontend/src/components/auth/RouteGuards.jsx).
+Hitting a protected route while signed out sends you to `/login?redirect_url=…`,
+and signing in returns you there — but only for same-site paths.
 
-### 3. Roles
+### 4. Roles
 
-The role is resolved in [`frontend/src/config/clerk.js`](frontend/src/config/clerk.js)
-in this order:
+The role is a claim in the JWT (`student` or `admin`), read from the `users.role`
+column at sign-in. Two consequences:
 
-1. `publicMetadata.role` — recommended, set from the Clerk dashboard
-2. `unsafeMetadata.role` — self-assigned at sign-up
-3. `VITE_ADMIN_EMAILS` — comma-separated dev escape hatch
-4. `student` — default
-
-Accepted admin values are `admin`, `warden`, `staff` and `administrator`.
-
-**To make a user a warden**, open the Clerk dashboard → **Users → select the user
-→ Metadata → Public** and set:
-
-```json
-{ "role": "admin" }
-```
-
-For local development you can skip the dashboard entirely:
+- Registration **always** creates a `student`. The register request has no role
+  field, so nobody can self-promote.
+- Admin is granted out-of-band. The first warden is bootstrapped from
+  `AUTH_ADMIN_EMAIL` / `AUTH_ADMIN_PASSWORD` in `.env`, at startup, and only when
+  no `ADMIN` exists yet — an existing user is never modified.
 
 ```bash
-# frontend/.env.local
-VITE_ADMIN_EMAILS=you@campus.edu
+# .env — created once on first start, then change the password
+AUTH_ADMIN_EMAIL=warden@ssn.edu.in
+AUTH_ADMIN_PASSWORD=ChangeMe-Warden-2026
 ```
 
-### 4. Linking Clerk users to student records
+To promote anyone else, set their `users.role` to `ADMIN` and have them sign in
+again — the new role arrives with the next token.
 
-The backend owns student data and keys it by its own numeric id, so
-[`UserContext`](frontend/src/contexts/UserContext.jsx) resolves the signed-in
-email against `GET /api/students/email/{email}` and exposes that record as
-`user`. Every existing page keeps working unchanged because `user.id` stays the
-numeric id the student-service expects.
+### 5. Linking accounts to student records
 
-If student-service is unreachable or has no matching record, the context falls
-back to the Clerk identity so the UI still renders instead of hanging.
+Credentials live in auth-service's `users` table; student data stays in the
+student-service `students` table. [`UserContext`](frontend/src/contexts/UserContext.jsx)
+resolves the signed-in email against `GET /api/students/email/{email}` and exposes
+that record as `user`, so `user.id` stays the numeric id every existing page
+already expects. When student-service is unreachable the context falls back to the
+account identity, so the UI still renders instead of hanging.
 
-### 5. Sign out and account management
-
-Both app shells use Clerk's `<UserButton />`. It opens an in-app account menu
-(manage account → Clerk `<UserProfile />` modal, sign out → `/login`) and is
-themed by the shared `clerkAppearance` object.
-
-> Clerk's prebuilt UI is bundled via `@clerk/ui` rather than loaded from Clerk's
-> CDN at runtime, so the auth screens render without a second network round-trip.
+Both app shells show the signed-in name, the role, and a sign-out button
+([`SignOutButton.jsx`](frontend/src/components/common/SignOutButton.jsx)). Signing
+out just clears the stored token — there is no server-side session to revoke, so a
+token stays valid until it expires. Shorten `JWT_EXPIRY_MINUTES` if that matters.
 
 
 ---
@@ -290,13 +300,14 @@ service, so the services stop being open endpoints.
 
 ### How a request is authenticated
 
-1. The browser gets a session token from Clerk (`useAuth().getToken()`), which
-   `ApiAuthBridge` publishes to `src/lib/http.js`.
+1. The browser gets a JWT from `POST /api/auth/login` and stores it in
+   `lib/authToken.js`.
 2. Every API call goes through `apiFetch()`, which attaches
    `Authorization: Bearer <token>` — 40 call sites, so nothing bypasses it
    silently.
-3. Caddy validates the token against Clerk's public JWKS (no per-request round
-   trip to Clerk) and forwards the request with `X-Clerk-User-Id` set.
+3. Caddy verifies the signature against the shared `JWT_SECRET` (no network round
+   trip to the issuer) and forwards the request with `X-Auth-User-Id` set from the
+   token's `sub` claim.
 
 Requests without a valid token get `401` before reaching any backend, and CORS
 preflight (`OPTIONS`) is answered before the auth check so browsers can actually
@@ -316,12 +327,13 @@ docker compose -f infrastructure/docker/docker-compose.yml up -d --build gateway
 
 | Variable | Default |
 |---|---|
-| `CLERK_ISSUER` | `https://exciting-zebra-1231.clerk.accounts.dev` |
-| `CLERK_JWKS_URL` | `<CLERK_ISSUER>/.well-known/jwks.json` |
+| `JWT_SECRET` | the development-only key in `.env` / `gateway/Caddyfile` |
 | `CORS_ALLOW_ORIGIN` | `http://localhost:5174` — the Vite dev server |
 
-Repoint these at a production Clerk instance when deploying; no code change is
-needed.
+`JWT_SECRET` arrives from the repository-root `.env` through `env_file`, and must
+match auth-service byte for byte. To switch to asymmetric signing, replace
+`sign_key` with `jwk_url` and have auth-service publish a key pair — nothing else
+changes.
 
 ### Frontend base URLs
 
@@ -337,6 +349,7 @@ VITE_API_BASE_URL=http://localhost:8081
 
 | Prefix | Service |
 |---|---|
+| `/api/auth/*` | auth-service :8085 — `login` and `register` are the only unauthenticated endpoints |
 | `/api/students/*`, `/api/preferences/*`, `/api/allocations/*` | student-service :8081 |
 | `/api/allocation/*` | allocation-service :8083 |
 | `/api/hostels/*`, `/api/rooms/*`, `/api/dashboard/*` | hostel-service :8082 |
@@ -350,14 +363,16 @@ what makes the routing unambiguous.
 ### Two caveats
 
 **The services are still directly reachable.** Each publishes its own host port,
-so they can be called without a token and `X-Clerk-User-Id` can be spoofed on a
-direct call. Remove the `ports:` entries from the service definitions to make
-the gateway the only way in; until then treat that header as advisory.
+so they can be called without a token, and `X-Auth-User-Id` can be spoofed on a
+direct call. Remove the `ports:` entries from the service definitions to make the
+gateway the only way in; until then treat that header as advisory. The gateway
+itself *overwrites* the header rather than appending, so it cannot be spoofed
+through the gateway.
 
 **The legacy password login is now dead.** `POST /api/students/login` sits under
 an authenticated prefix, so it can no longer be reached without a token — correct
-now that Clerk owns identity, but it means the endpoint is unreachable. Delete it
-when convenient.
+now that auth-service owns identity, but it means the endpoint is unreachable.
+Delete it, along with the `password` column on `students`, when convenient.
 
 ---
 

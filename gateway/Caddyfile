@@ -3,9 +3,13 @@
 # Development: runs on localhost:80, services on localhost ports.
 # Docker:      service names resolve via Docker DNS (e.g. student-service:8081).
 #
-# Authentication: every request under /api/* must carry a Clerk session token as
-# `Authorization: Bearer <token>`. The token is verified locally against Clerk's
-# public JWKS, so no per-request round trip to Clerk is needed.
+# Authentication: every request under /api/* must carry a JWT issued by
+# auth-service as `Authorization: Bearer <token>`. Tokens are HS256, signed with
+# a secret shared with auth-service via JWT_SECRET, and verified locally here —
+# no per-request round trip to the issuer.
+#
+# The only unauthenticated endpoints are POST /api/auth/login and
+# POST /api/auth/register, which is where tokens come from in the first place.
 #
 # IMPORTANT: this gateway is only the enforcement point. The services still
 # publish their own host ports, so they remain reachable directly and can be
@@ -45,7 +49,25 @@
 			respond "" 204
 		}
 
-		# ── 2. Authenticated API surface ──────────────────────────────────────
+		# ── 2. Public auth endpoints ──────────────────────────────────────────
+		# These two are where tokens come from, so they cannot require one. Matched
+		# by method *and* path so nothing else slips through unauthenticated — in
+		# particular /api/auth/me falls through to the block below and is checked.
+		@publicAuth {
+			method POST
+			path /api/auth/login /api/auth/register
+		}
+		handle @publicAuth {
+			# Still needs the CORS header, otherwise the browser discards the
+			# response and a failed login looks like a network error.
+			header {
+				Access-Control-Allow-Origin "{$CORS_ALLOW_ORIGIN:http://localhost:5174}"
+				Vary Origin
+			}
+			reverse_proxy auth-service:8085
+		}
+
+		# ── 3. Authenticated API surface ──────────────────────────────────────
 		handle /api/* {
 
 			# Set before jwtauth so the browser can still read a 401 body.
@@ -55,11 +77,16 @@
 			}
 
 			jwtauth {
-				# Clerk's public keys. Swap these two env vars to point at a
-				# production Clerk instance — no code change needed.
-				jwk_url {$CLERK_JWKS_URL:https://exciting-zebra-1231.clerk.accounts.dev/.well-known/jwks.json}
-				issuer_whitelist {$CLERK_ISSUER:https://exciting-zebra-1231.clerk.accounts.dev}
-				# `sub` is the Clerk user id; it becomes {http.auth.user.id}.
+				# Shared secret with auth-service. Providing sign_key alone would
+				# already imply HS256, but naming the algorithm keeps a production
+				# swap (e.g. to RS256 + jwk_url) a one-line change.
+				sign_alg HS256
+				# Must be identical to auth-service's auth.jwt.secret, and base64:
+				# caddy-jwt decodes this value into raw key bytes.
+				sign_key {$JWT_SECRET:c3RhYmxlLXJvb21pZXMtZGV2LW9ubHktand0LXNlY3JldC0zMmI=}
+				# Rejects tokens minted for a different issuer on the same secret.
+				issuer_whitelist stable-roomies-auth
+				# `sub` is the user id and populates {http.auth.user.id}.
 				user_claims sub
 				log_level debug
 			}
@@ -67,12 +94,12 @@
 			# ── Student service ───────────────────────────────────────────────
 			handle /api/students/* {
 				reverse_proxy student-service:8081 {
-					header_up X-Clerk-User-Id {http.auth.user.id}
+					header_up X-Auth-User-Id {http.auth.user.id}
 				}
 			}
 			handle /api/preferences/* {
 				reverse_proxy student-service:8081 {
-					header_up X-Clerk-User-Id {http.auth.user.id}
+					header_up X-Auth-User-Id {http.auth.user.id}
 				}
 			}
 			# Student-facing allocation summary. The engine-facing allocation API
@@ -80,45 +107,55 @@
 			# different path segment and so does not overlap this one.
 			handle /api/allocations/* {
 				reverse_proxy student-service:8081 {
-					header_up X-Clerk-User-Id {http.auth.user.id}
+					header_up X-Auth-User-Id {http.auth.user.id}
 				}
 			}
 
 			# ── Allocation service ────────────────────────────────────────────
 			handle /api/allocation/* {
 				reverse_proxy allocation-service:8083 {
-					header_up X-Clerk-User-Id {http.auth.user.id}
+					header_up X-Auth-User-Id {http.auth.user.id}
 				}
 			}
 
 			# ── Hostel service ────────────────────────────────────────────────
 			handle /api/hostels/* {
 				reverse_proxy hostel-service:8082 {
-					header_up X-Clerk-User-Id {http.auth.user.id}
+					header_up X-Auth-User-Id {http.auth.user.id}
 				}
 			}
 			handle /api/rooms/* {
 				reverse_proxy hostel-service:8082 {
-					header_up X-Clerk-User-Id {http.auth.user.id}
+					header_up X-Auth-User-Id {http.auth.user.id}
 				}
 			}
 			handle /api/dashboard/* {
 				reverse_proxy hostel-service:8082 {
-					header_up X-Clerk-User-Id {http.auth.user.id}
+					header_up X-Auth-User-Id {http.auth.user.id}
 				}
 			}
 
 			# ── Notification service ──────────────────────────────────────────
 			handle /api/notifications/* {
 				reverse_proxy notification-service:8084 {
-					header_up X-Clerk-User-Id {http.auth.user.id}
+					header_up X-Auth-User-Id {http.auth.user.id}
+				}
+			}
+
+			# ── Auth service ──────────────────────────────────────────────────
+			# Everything here except login/register needs a valid token, because
+			# the public pair is matched earlier in this route. Keeping it behind
+			# jwtauth is what stops /api/auth/me being callable anonymously.
+			handle /api/auth/* {
+				reverse_proxy auth-service:8085 {
+					header_up X-Auth-User-Id {http.auth.user.id}
 				}
 			}
 
 			# ── Algorithm engine ──────────────────────────────────────────────
 			handle /api/v1/allocation/* {
 				reverse_proxy algorithm-engine:8090 {
-					header_up X-Clerk-User-Id {http.auth.user.id}
+					header_up X-Auth-User-Id {http.auth.user.id}
 				}
 			}
 
@@ -127,7 +164,7 @@
 			respond 404
 		}
 
-		# ── 3. Frontend (catch-all) ───────────────────────────────────────────
+		# ── 4. Frontend (catch-all) ───────────────────────────────────────────
 		handle {
 			reverse_proxy frontend:80
 		}

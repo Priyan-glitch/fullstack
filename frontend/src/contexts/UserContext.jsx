@@ -6,10 +6,9 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { useClerk, useUser as useClerkUser } from '@clerk/react';
 import { API_BASE_URL, API_ENDPOINTS } from '../config/api';
-import { resolveRole, AUTH_ROUTES } from '../config/clerk';
-import { apiFetch } from '../lib/http';
+import { apiFetch, onUnauthorized } from '../lib/http';
+import { clearToken, getToken, isTokenExpired, setToken } from '../lib/authToken';
 
 const UserContext = createContext(null);
 
@@ -25,29 +24,87 @@ export const useUser = () => {
 };
 
 /**
- * Bridges Clerk (identity) with the student-service (application data).
+ * Turns an auth-service error envelope — `{ status, message, errors? }` — into a
+ * single string a form can display. Field-level errors win, since "Password must
+ * be at least 8 characters" is more useful than "Please check the fields".
+ */
+async function readErrorMessage(response, fallback) {
+  try {
+    const body = await response.json();
+    const firstFieldError = body?.errors ? Object.values(body.errors)[0] : null;
+    if (typeof firstFieldError === 'string' && firstFieldError) return firstFieldError;
+    if (typeof body?.message === 'string' && body.message) return body.message;
+  } catch {
+    // Non-JSON body (a proxy error page, say) — fall through to the fallback.
+  }
+  return fallback;
+}
+
+/**
+ * Authentication is handled entirely by auth-service; this provider is the
+ * frontend's view of the resulting JWT.
  *
- * Clerk owns authentication; the backend owns the student record. The record is
- * located by email so that `user.id` stays the numeric id every existing API
- * call already expects. When the backend is unreachable the Clerk identity is
- * exposed instead, so the UI still renders instead of hanging.
+ * It also bridges to the student-service: identity lives in auth-service, but
+ * application data lives in the `students` table. The record is located by email
+ * so `user.id` stays the numeric student id every existing API call expects.
  */
 export const UserProvider = ({ children }) => {
-  const { isLoaded, isSignedIn, user: clerkUser } = useClerkUser();
-  const { signOut } = useClerk();
-
+  const [account, setAccount] = useState(null);
+  const [restoring, setRestoring] = useState(true);
   const [record, setRecord] = useState(null);
   const [lookup, setLookup] = useState({ email: null, done: false });
 
-  const email = clerkUser?.primaryEmailAddress?.emailAddress ?? null;
-  const role = useMemo(() => resolveRole(clerkUser), [clerkUser]);
+  const role = account?.role ?? null;
 
-  // Admins have no student record, so only students trigger the lookup.
-  const needsLookup =
-    isLoaded && isSignedIn === true && role === 'student' && Boolean(email);
+  // ── Restore a session on load ──────────────────────────────────────────────
+  // The token is only trusted after /me confirms it: it may have been revoked,
+  // or signed with a secret this deployment no longer uses.
+  useEffect(() => {
+    if (!getToken() || isTokenExpired()) {
+      clearToken();
+      setRestoring(false);
+      return undefined;
+    }
 
-  const lookupPending =
-    needsLookup && !(lookup.email === email && lookup.done);
+    let cancelled = false;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), PROFILE_LOOKUP_TIMEOUT_MS);
+
+    (async () => {
+      try {
+        const response = await apiFetch(`${API_BASE_URL}${API_ENDPOINTS.AUTH_ME}`, {
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          throw new Error(`session check returned ${response.status}`);
+        }
+        const me = await response.json();
+        if (!cancelled) setAccount(me);
+      } catch (error) {
+        if (!cancelled) {
+          clearToken();
+          setAccount(null);
+          if (!controller.signal.aborted) {
+            console.warn('[auth] stored session is no longer valid:', error.message);
+          }
+        }
+      } finally {
+        clearTimeout(timeout);
+        if (!cancelled) setRestoring(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+      controller.abort();
+    };
+  }, []);
+
+  // ── Bridge identity to the student record ─────────────────────────────────
+  const email = account?.email ?? null;
+  const needsLookup = Boolean(email) && role === 'student';
+  const lookupPending = needsLookup && !(lookup.email === email && lookup.done);
 
   useEffect(() => {
     if (!needsLookup) return undefined;
@@ -70,7 +127,7 @@ export const UserProvider = ({ children }) => {
       } catch (error) {
         if (!error?.name?.includes('Abort')) {
           console.warn(
-            `[auth] no student record for ${email}; falling back to the Clerk identity.`,
+            `[auth] no student record for ${email}; falling back to the account identity.`,
             error.message,
           );
         }
@@ -88,9 +145,59 @@ export const UserProvider = ({ children }) => {
     };
   }, [needsLookup, email]);
 
-  const logout = useCallback(
-    () => signOut({ redirectUrl: AUTH_ROUTES.afterSignOut }),
-    [signOut],
+  const logout = useCallback(() => {
+    clearToken();
+    setAccount(null);
+    setRecord(null);
+    setLookup({ email: null, done: false });
+  }, []);
+
+  // A rejected token anywhere in the app ends the session, so an expired token
+  // cannot leave the UI in a half-signed-in state.
+  useEffect(() => {
+    onUnauthorized(logout);
+    return () => onUnauthorized(null);
+  }, [logout]);
+
+  const establishSession = useCallback((auth) => {
+    setToken(auth.token);
+    setAccount(auth.user);
+    return auth.user;
+  }, []);
+
+  const login = useCallback(
+    async (credentialsEmail, password) => {
+      const response = await apiFetch(`${API_BASE_URL}${API_ENDPOINTS.AUTH_LOGIN}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: credentialsEmail, password }),
+      });
+
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response, 'Could not sign you in.'));
+      }
+
+      return establishSession(await response.json());
+    },
+    [establishSession],
+  );
+
+  const register = useCallback(
+    async ({ email: newEmail, password, firstName, lastName }) => {
+      const response = await apiFetch(`${API_BASE_URL}${API_ENDPOINTS.AUTH_REGISTER}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: newEmail, password, firstName, lastName }),
+      });
+
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response, 'Could not create your account.'));
+      }
+
+      // Registration returns a token too, so signing up signs you in.
+      return establishSession(await response.json());
+    },
+    [establishSession],
   );
 
   /** Merges a backend student payload (e.g. a profile update) into context. */
@@ -100,25 +207,22 @@ export const UserProvider = ({ children }) => {
   }, []);
 
   const user = useMemo(() => {
-    if (!clerkUser) return null;
+    if (!account) return null;
     const profile = record ?? {};
 
     return {
       ...profile,
-      // Numeric backend id when the record exists, Clerk id otherwise.
-      id: profile.id ?? clerkUser.id,
-      clerkId: clerkUser.id,
-      firstName: profile.firstName || clerkUser.firstName || '',
-      lastName: profile.lastName || clerkUser.lastName || '',
-      email: profile.email || email || '',
-      phone: profile.phone || clerkUser.primaryPhoneNumber?.phoneNumber || '',
-      imageUrl: clerkUser.imageUrl,
+      // Numeric student id when the record exists, auth-service id otherwise.
+      id: profile.id ?? account.id,
+      accountId: account.id,
+      firstName: profile.firstName || account.firstName || '',
+      lastName: profile.lastName || account.lastName || '',
+      email: profile.email || account.email || '',
       role,
     };
-  }, [clerkUser, record, role, email]);
+  }, [account, record, role]);
 
-  const loading =
-    !isLoaded || (isSignedIn === true && lookupPending);
+  const loading = restoring || (role === 'student' && lookupPending);
 
   const value = {
     user,
@@ -126,9 +230,11 @@ export const UserProvider = ({ children }) => {
     loading,
     /** True when the backend student record was found. */
     hasProfile: Boolean(record?.id),
-    isAuthenticated: isSignedIn === true,
+    isAuthenticated: Boolean(account),
     isStudent: role === 'student',
     isAdmin: role === 'admin',
+    login,
+    register,
     logout,
     updateUser,
   };
