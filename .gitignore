@@ -73,3 +73,8 @@ desktop.ini
 .env
 .env.*
 !.env.example
+
+# ── Docker Compose machine-local overrides ────────────────────────────────────
+# These encode one developer's own port mappings, so they must never be shared.
+# See the Infrastructure section of the README for the 5432 conflict workaround.
+docker-compose.override.yml
