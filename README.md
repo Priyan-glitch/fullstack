@@ -163,6 +163,41 @@ docker compose -f infrastructure/docker/docker-compose.yml up --build
 
 ---
 
+## Database configuration
+
+Datasource credentials are read from environment variables, with the local
+docker Postgres as the fallback, so no real credential lives in the repository:
+
+| Variable | Fallback |
+|---|---|
+| `SPRING_DATASOURCE_URL` | per service — student `5432`, hostel `5433`, notification `5432` |
+| `SPRING_DATASOURCE_USERNAME` | `postgres` |
+| `SPRING_DATASOURCE_PASSWORD` | `postgres` |
+
+Each service automatically imports a repository-root `.env` through
+`spring.config.import: optional:file:../../.env[.properties]`, so starting a
+service from its own directory picks up the values with no extra setup:
+
+```bash
+cd backend/student-service && mvn spring-boot:run
+```
+
+`.env` is gitignored and holds real credentials — never commit it, and never
+`git add -f` it. Put your provider's values there rather than hardcoding them in
+`application.yml`, which is tracked in a public repository.
+
+> The fetched file must be Java-properties format, not shell: a JDBC URL
+> containing `&` cannot be loaded with `source .env` because bash treats `&` as
+> a background operator. Let Spring read it, or export the variables yourself.
+
+`allocation-service` talks to RabbitMQ only — it has no datasource.
+
+To move between the local docker Postgres and a hosted database (Neon, RDS,
+Supabase), change only `.env`; no code or YAML edits are needed.
+
+
+---
+
 ## Authentication (Clerk)
 
 Authentication is handled entirely by Clerk on the frontend. The React app never

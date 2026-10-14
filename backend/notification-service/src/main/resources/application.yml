@@ -5,6 +5,11 @@ spring:
   application:
     name: notification-service
 
+  # Loads ../../.env when the service is started from this directory, so the real
+  # datasource credentials stay out of git.
+  config:
+    import: "optional:file:../../.env[.properties]"
+
   # PostgreSQL — stores notification records
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/notification_db?options=-c%20TimeZone=UTC}

@@ -1,10 +1,17 @@
 spring:
   application:
     name: hostel-service
+
+  # Loads ../../.env when the service is started from this directory, so the real
+  # datasource credentials stay out of git. Optional, so the local docker
+  # Postgres defaults below still apply when no .env is present.
+  config:
+    import: "optional:file:../../.env[.properties]"
+
   datasource:
-    url: jdbc:postgresql://localhost:5433/hostel_db?serverTimezone=UTC
-    username: postgres
-    password: postgres
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5433/hostel_db?serverTimezone=UTC}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
     hikari:
       connection-init-sql: SET TIME ZONE 'UTC'
   jpa:
