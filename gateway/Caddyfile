@@ -1,52 +1,135 @@
-# Stable Roomies – Caddy Reverse Proxy / API Gateway
+# Stable Roomies — API gateway (Caddy + JWT authentication)
 #
-# Development: runs on localhost, services on localhost ports.
+# Development: runs on localhost:80, services on localhost ports.
 # Docker:      service names resolve via Docker DNS (e.g. student-service:8081).
 #
-# Replace :80 with your domain in production — Caddy handles TLS automatically.
+# Authentication: every request under /api/* must carry a Clerk session token as
+# `Authorization: Bearer <token>`. The token is verified locally against Clerk's
+# public JWKS, so no per-request round trip to Clerk is needed.
+#
+# IMPORTANT: this gateway is only the enforcement point. The services still
+# publish their own host ports, so they remain reachable directly and can be
+# called without a token. Remove those port mappings to make the gateway the
+# only way in — see the README.
+
+{
+	# jwtauth is a custom directive from the ggicci/caddy-jwt module, so it needs
+	# an explicit position in the handler chain. Placing it before basicauth puts
+	# it ahead of handle / reverse_proxy, i.e. the token is checked before any
+	# request reaches a backend.
+	order jwtauth before basicauth
+}
 
 :80 {
 
-    # ── Student Service ───────────────────────────────────────────────────────
-    handle /api/v1/students/* {
-        reverse_proxy student-service:8081
-    }
+	encode gzip
 
-    handle /api/v1/preferences/* {
-        reverse_proxy student-service:8081
-    }
+	# `route` keeps the blocks below in source order. That matters: CORS has to be
+	# answered before jwtauth, otherwise the preflight would come back 401 because
+	# preflight requests never carry an Authorization header.
+	route {
 
-    # ── Hostel Service ────────────────────────────────────────────────────────
-    handle /api/v1/hostels/* {
-        reverse_proxy hostel-service:8082
-    }
+		# ── 1. CORS preflight — answered here, never authenticated ─────────────
+		@preflight {
+			method OPTIONS
+			path /api/*
+		}
+		handle @preflight {
+			header {
+				Access-Control-Allow-Origin "{$CORS_ALLOW_ORIGIN:http://localhost:5174}"
+				Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+				Access-Control-Allow-Headers "Authorization, Content-Type"
+				Access-Control-Max-Age "600"
+				Vary Origin
+			}
+			respond "" 204
+		}
 
-    handle /api/v1/rooms/* {
-        reverse_proxy hostel-service:8082
-    }
+		# ── 2. Authenticated API surface ──────────────────────────────────────
+		handle /api/* {
 
-    # ── Allocation Service ────────────────────────────────────────────────────
-    handle /api/v1/allocations/* {
-        reverse_proxy allocation-service:8083
-    }
+			# Set before jwtauth so the browser can still read a 401 body.
+			header {
+				Access-Control-Allow-Origin "{$CORS_ALLOW_ORIGIN:http://localhost:5174}"
+				Vary Origin
+			}
 
-    handle /api/v1/room-changes/* {
-        reverse_proxy allocation-service:8083
-    }
+			jwtauth {
+				# Clerk's public keys. Swap these two env vars to point at a
+				# production Clerk instance — no code change needed.
+				jwk_url {$CLERK_JWKS_URL:https://exciting-zebra-1231.clerk.accounts.dev/.well-known/jwks.json}
+				issuer_whitelist {$CLERK_ISSUER:https://exciting-zebra-1231.clerk.accounts.dev}
+				# `sub` is the Clerk user id; it becomes {http.auth.user.id}.
+				user_claims sub
+				log_level debug
+			}
 
-    # ── Notification Service ──────────────────────────────────────────────────
-    handle /api/v1/notifications/* {
-        reverse_proxy notification-service:8084
-    }
+			# ── Student service ───────────────────────────────────────────────
+			handle /api/students/* {
+				reverse_proxy student-service:8081 {
+					header_up X-Clerk-User-Id {http.auth.user.id}
+				}
+			}
+			handle /api/preferences/* {
+				reverse_proxy student-service:8081 {
+					header_up X-Clerk-User-Id {http.auth.user.id}
+				}
+			}
+			# Student-facing allocation summary. The engine-facing allocation API
+			# lives under /api/allocation/* — note the singular, which is a
+			# different path segment and so does not overlap this one.
+			handle /api/allocations/* {
+				reverse_proxy student-service:8081 {
+					header_up X-Clerk-User-Id {http.auth.user.id}
+				}
+			}
 
-    # ── Algorithm Engine (internal) ───────────────────────────────────────────
-    handle /api/v1/algorithm/* {
-        reverse_proxy algorithm-engine:8090
-    }
+			# ── Allocation service ────────────────────────────────────────────
+			handle /api/allocation/* {
+				reverse_proxy allocation-service:8083 {
+					header_up X-Clerk-User-Id {http.auth.user.id}
+				}
+			}
 
-    # ── Frontend (catch-all) ──────────────────────────────────────────────────
-    handle /* {
-        reverse_proxy frontend:80
-    }
+			# ── Hostel service ────────────────────────────────────────────────
+			handle /api/hostels/* {
+				reverse_proxy hostel-service:8082 {
+					header_up X-Clerk-User-Id {http.auth.user.id}
+				}
+			}
+			handle /api/rooms/* {
+				reverse_proxy hostel-service:8082 {
+					header_up X-Clerk-User-Id {http.auth.user.id}
+				}
+			}
+			handle /api/dashboard/* {
+				reverse_proxy hostel-service:8082 {
+					header_up X-Clerk-User-Id {http.auth.user.id}
+				}
+			}
 
+			# ── Notification service ──────────────────────────────────────────
+			handle /api/notifications/* {
+				reverse_proxy notification-service:8084 {
+					header_up X-Clerk-User-Id {http.auth.user.id}
+				}
+			}
+
+			# ── Algorithm engine ──────────────────────────────────────────────
+			handle /api/v1/allocation/* {
+				reverse_proxy algorithm-engine:8090 {
+					header_up X-Clerk-User-Id {http.auth.user.id}
+				}
+			}
+
+			# Any other /api/* path is a client mistake, not a page. Returning 404
+			# here stops it falling through to the SPA and rendering the app shell.
+			respond 404
+		}
+
+		# ── 3. Frontend (catch-all) ───────────────────────────────────────────
+		handle {
+			reverse_proxy frontend:80
+		}
+	}
 }

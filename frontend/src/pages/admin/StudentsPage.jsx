@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import AdminLayout from '../../layouts/AdminLayout';
 import { API_BASE_URL, API_ENDPOINTS } from '../../config/api';
+import { apiFetch } from '../../lib/http';
 
 // Simple icon components
 const SearchIcon = ({ className }) => (
@@ -67,7 +68,7 @@ export default function StudentsPage() {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.STUDENTS}`);
+      const response = await apiFetch(`${API_BASE_URL}${API_ENDPOINTS.STUDENTS}`);
       if (!response.ok) throw new Error('Failed to fetch students');
       const data = await response.json();
       setStudents(data);
@@ -113,7 +114,7 @@ export default function StudentsPage() {
 
   const handleToggleActive = async (studentId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.TOGGLE_STUDENT_ACTIVE(studentId)}`, {
+      const response = await apiFetch(`${API_BASE_URL}${API_ENDPOINTS.TOGGLE_STUDENT_ACTIVE(studentId)}`, {
         method: 'PATCH',
       });
       if (!response.ok) throw new Error('Failed to toggle student status');
@@ -138,7 +139,7 @@ export default function StudentsPage() {
     setStudentPreferences(null);
     
     try {
-      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.PREFERENCES_BY_STUDENT(student.id)}`);
+      const response = await apiFetch(`${API_BASE_URL}${API_ENDPOINTS.PREFERENCES_BY_STUDENT(student.id)}`);
       if (response.ok) {
         const data = await response.json();
         setStudentPreferences(data);

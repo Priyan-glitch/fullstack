@@ -9,6 +9,7 @@ import {
 import { useClerk, useUser as useClerkUser } from '@clerk/react';
 import { API_BASE_URL, API_ENDPOINTS } from '../config/api';
 import { resolveRole, AUTH_ROUTES } from '../config/clerk';
+import { apiFetch } from '../lib/http';
 
 const UserContext = createContext(null);
 
@@ -57,7 +58,7 @@ export const UserProvider = ({ children }) => {
 
     (async () => {
       try {
-        const response = await fetch(
+        const response = await apiFetch(
           `${API_BASE_URL}${API_ENDPOINTS.STUDENT_BY_EMAIL(encodeURIComponent(email))}`,
           { signal: controller.signal },
         );

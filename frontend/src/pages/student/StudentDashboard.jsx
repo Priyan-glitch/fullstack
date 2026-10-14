@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../../contexts/UserContext';
 import { API_BASE_URL, ALLOCATION_API_BASE_URL, API_ENDPOINTS } from '../../config/api';
+import { apiFetch } from '../../lib/http';
 import StudentLayout from '../../layouts/StudentLayout';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -290,7 +291,7 @@ export default function StudentDashboard() {
       setLoading(true);
       try {
         // Fetch preferences
-        const prefsResponse = await fetch(
+        const prefsResponse = await apiFetch(
           `${API_BASE_URL}${API_ENDPOINTS.PREFERENCES_BY_STUDENT(user.id)}`
         );
         if (prefsResponse.ok) {
@@ -299,7 +300,7 @@ export default function StudentDashboard() {
         }
 
         // Fetch allocation status
-        const allocResponse = await fetch(
+        const allocResponse = await apiFetch(
           `${ALLOCATION_API_BASE_URL}${API_ENDPOINTS.ALLOCATION_BY_STUDENT(user.id)}`
         );
         if (allocResponse.ok) {

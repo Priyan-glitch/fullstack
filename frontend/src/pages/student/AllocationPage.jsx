@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useUser } from '../../contexts/UserContext';
 import { ALLOCATION_API_BASE_URL, API_ENDPOINTS } from '../../config/api';
+import { apiFetch } from '../../lib/http';
 import StudentLayout from '../../layouts/StudentLayout';
 
 // Simple icon components as replacements
@@ -46,7 +47,7 @@ export default function AllocationPage() {
     const fetchAllocation = async () => {
       try {
         setLoading(true);
-        const res = await fetch(`${ALLOCATION_API_BASE_URL}${API_ENDPOINTS.ALLOCATION_BY_STUDENT(user.id)}`);
+        const res = await apiFetch(`${ALLOCATION_API_BASE_URL}${API_ENDPOINTS.ALLOCATION_BY_STUDENT(user.id)}`);
         if (res.ok) {
           const data = await res.json();
           if (data.allocationStatus === 'allocated' && data.room) {

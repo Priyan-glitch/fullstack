@@ -1,9 +1,21 @@
+import { apiFetch } from '../lib/http';
+
 // API Configuration
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081';
-export const HOSTEL_API_BASE_URL = import.meta.env.VITE_HOSTEL_API_BASE_URL || 'http://localhost:8082';
-export const ALLOCATION_SERVICE_URL = import.meta.env.VITE_ALLOCATION_SERVICE_URL || 'http://localhost:8083';
-export const NOTIFICATION_API_BASE_URL = import.meta.env.VITE_NOTIFICATION_API_BASE_URL || 'http://localhost:8084';
-export const ALGORITHM_API_BASE_URL = import.meta.env.VITE_ALGORITHM_API_BASE_URL || 'http://localhost:8090';
+//
+// Every API call goes through the gateway (gateway/Caddyfile), which verifies
+// the Clerk session token before proxying to a service. One origin for all
+// services, so CORS is a single relationship instead of five.
+//
+// The per-service env vars are kept so you can bypass the gateway while
+// developing a single service — set e.g. VITE_API_BASE_URL=http://localhost:8081
+// in frontend/.env.local. Left unset, everything points at the gateway.
+export const GATEWAY_BASE_URL = import.meta.env.VITE_GATEWAY_BASE_URL || 'http://localhost';
+
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || GATEWAY_BASE_URL;
+export const HOSTEL_API_BASE_URL = import.meta.env.VITE_HOSTEL_API_BASE_URL || GATEWAY_BASE_URL;
+export const ALLOCATION_SERVICE_URL = import.meta.env.VITE_ALLOCATION_SERVICE_URL || GATEWAY_BASE_URL;
+export const NOTIFICATION_API_BASE_URL = import.meta.env.VITE_NOTIFICATION_API_BASE_URL || GATEWAY_BASE_URL;
+export const ALGORITHM_API_BASE_URL = import.meta.env.VITE_ALGORITHM_API_BASE_URL || GATEWAY_BASE_URL;
 // Alias kept for backward-compat with files that still import the old name
 export const ALLOCATION_API_BASE_URL = API_BASE_URL;
 
@@ -29,11 +41,14 @@ export const API_ENDPOINTS = {
   PREFERENCES_SAVE: (studentId) => `/api/preferences/student/${studentId}`,
   PREFERENCES_EXISTS: (studentId) => `/api/preferences/student/${studentId}/exists`,
   
-  // Student-service allocation (student-facing)
+  // Student-service allocation (student-facing).
+  // Note the two distinct prefixes: /api/allocations/* is served by
+  // student-service, /api/allocation/* by allocation-service. They are separate
+  // path segments, so the gateway routes them unambiguously.
   ALLOCATION_BY_STUDENT: (studentId) => `/api/allocations/student/${studentId}`,
-  ALLOCATION_ROOMMATES: (studentId) => `/api/allocations/student/${studentId}/roommates`,
-  ALLOCATION_TRIGGER: '/api/allocations/trigger',
-  ALLOCATION_SAMPLE: (studentId) => `/api/allocations/student/${studentId}/sample`,
+  ALLOCATION_ROOMMATES: (studentId) => `/api/allocation/student/${studentId}/roommates`,
+  ALLOCATION_TRIGGER: '/api/allocation/trigger',
+  ALLOCATION_SAMPLE: (studentId) => `/api/allocation/student/${studentId}/sample`,
 
   // Algorithm Engine (admin-facing, port 8090)
   ALGO_STRATEGIES: '/api/v1/allocation/strategies',
@@ -64,31 +79,31 @@ export const API_ENDPOINTS = {
 // Notification Service API helpers
 export const notificationApi = {
   getNotifications: async (userId) => {
-    const res = await fetch(`${NOTIFICATION_API_BASE_URL}${API_ENDPOINTS.NOTIFICATIONS_FOR_USER(userId)}`);
+    const res = await apiFetch(`${NOTIFICATION_API_BASE_URL}${API_ENDPOINTS.NOTIFICATIONS_FOR_USER(userId)}`);
     if (!res.ok) throw new Error('Failed to fetch notifications');
     return res.json();
   },
   getUnreadCount: async (userId) => {
-    const res = await fetch(`${NOTIFICATION_API_BASE_URL}${API_ENDPOINTS.NOTIFICATIONS_UNREAD(userId)}`);
+    const res = await apiFetch(`${NOTIFICATION_API_BASE_URL}${API_ENDPOINTS.NOTIFICATIONS_UNREAD(userId)}`);
     if (!res.ok) throw new Error('Failed to fetch unread count');
     return res.json();
   },
   markRead: async (id, userId) => {
-    const res = await fetch(`${NOTIFICATION_API_BASE_URL}${API_ENDPOINTS.NOTIFICATIONS_MARK_READ(id, userId)}`, {
+    const res = await apiFetch(`${NOTIFICATION_API_BASE_URL}${API_ENDPOINTS.NOTIFICATIONS_MARK_READ(id, userId)}`, {
       method: 'PATCH',
     });
     if (!res.ok) throw new Error('Failed to mark notification as read');
     return res.json();
   },
   markAllRead: async (userId) => {
-    const res = await fetch(`${NOTIFICATION_API_BASE_URL}${API_ENDPOINTS.NOTIFICATIONS_MARK_ALL_READ(userId)}`, {
+    const res = await apiFetch(`${NOTIFICATION_API_BASE_URL}${API_ENDPOINTS.NOTIFICATIONS_MARK_ALL_READ(userId)}`, {
       method: 'POST',
     });
     if (!res.ok) throw new Error('Failed to mark all notifications as read');
     return res.json();
   },
   delete: async (id) => {
-    const res = await fetch(`${NOTIFICATION_API_BASE_URL}${API_ENDPOINTS.NOTIFICATIONS_DELETE(id)}`, {
+    const res = await apiFetch(`${NOTIFICATION_API_BASE_URL}${API_ENDPOINTS.NOTIFICATIONS_DELETE(id)}`, {
       method: 'DELETE',
     });
     if (!res.ok) throw new Error('Failed to delete notification');
@@ -108,7 +123,7 @@ export const apiCall = async (endpoint, options = {}) => {
   };
 
   try {
-    const response = await fetch(url, { ...defaultOptions, ...options });
+    const response = await apiFetch(url, { ...defaultOptions, ...options });
     
     if (!response.ok) {
       throw new Error(`API call failed: ${response.statusText}`);

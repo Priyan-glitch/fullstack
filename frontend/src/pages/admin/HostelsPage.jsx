@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import AdminLayout from '../../layouts/AdminLayout';
 import { HOSTEL_API_BASE_URL, API_ENDPOINTS } from '../../config/api';
+import { apiFetch } from '../../lib/http';
 
 // Simple icon components
 const BuildingIcon = ({ className }) => (
@@ -61,7 +62,7 @@ export default function HostelsPage() {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`${HOSTEL_API_BASE_URL}${API_ENDPOINTS.HOSTELS}`);
+      const response = await apiFetch(`${HOSTEL_API_BASE_URL}${API_ENDPOINTS.HOSTELS}`);
       if (!response.ok) throw new Error('Failed to fetch hostels');
       const data = await response.json();
       setHostels(data);
@@ -118,7 +119,7 @@ export default function HostelsPage() {
     if (!window.confirm('Are you sure you want to delete this hostel?')) return;
     
     try {
-      const response = await fetch(`${HOSTEL_API_BASE_URL}${API_ENDPOINTS.HOSTEL_BY_ID(id)}`, {
+      const response = await apiFetch(`${HOSTEL_API_BASE_URL}${API_ENDPOINTS.HOSTEL_BY_ID(id)}`, {
         method: 'DELETE',
       });
       if (!response.ok) throw new Error('Failed to delete hostel');
@@ -148,7 +149,7 @@ export default function HostelsPage() {
       
       const method = editingHostel ? 'PUT' : 'POST';
 
-      const response = await fetch(url, {
+      const response = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(hostelData),

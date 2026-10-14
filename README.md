@@ -282,6 +282,85 @@ themed by the shared `clerkAppearance` object.
 
 ---
 
+## API gateway & authentication
+
+All frontend API calls go through the gateway (`gateway/Caddyfile`, port 80).
+It verifies a Clerk session token on every `/api/*` request before proxying to a
+service, so the services stop being open endpoints.
+
+### How a request is authenticated
+
+1. The browser gets a session token from Clerk (`useAuth().getToken()`), which
+   `ApiAuthBridge` publishes to `src/lib/http.js`.
+2. Every API call goes through `apiFetch()`, which attaches
+   `Authorization: Bearer <token>` — 40 call sites, so nothing bypasses it
+   silently.
+3. Caddy validates the token against Clerk's public JWKS (no per-request round
+   trip to Clerk) and forwards the request with `X-Clerk-User-Id` set.
+
+Requests without a valid token get `401` before reaching any backend, and CORS
+preflight (`OPTIONS`) is answered before the auth check so browsers can actually
+read that `401`.
+
+### Building the gateway
+
+The stock `caddy:2` image cannot validate JWTs, so `gateway/Dockerfile` compiles
+the `ggicci/caddy-jwt` module in with `xcaddy`. Build it with the rest of the
+stack:
+
+```bash
+docker compose -f infrastructure/docker/docker-compose.yml up -d --build gateway
+```
+
+### Configuration
+
+| Variable | Default |
+|---|---|
+| `CLERK_ISSUER` | `https://exciting-zebra-1231.clerk.accounts.dev` |
+| `CLERK_JWKS_URL` | `<CLERK_ISSUER>/.well-known/jwks.json` |
+| `CORS_ALLOW_ORIGIN` | `http://localhost:5174` — the Vite dev server |
+
+Repoint these at a production Clerk instance when deploying; no code change is
+needed.
+
+### Frontend base URLs
+
+Every base URL defaults to the gateway (`VITE_GATEWAY_BASE_URL`, default
+`http://localhost`). To bypass the gateway while working on a single service,
+override that service in `frontend/.env.local`:
+
+```bash
+VITE_API_BASE_URL=http://localhost:8081
+```
+
+### Path conventions
+
+| Prefix | Service |
+|---|---|
+| `/api/students/*`, `/api/preferences/*`, `/api/allocations/*` | student-service :8081 |
+| `/api/allocation/*` | allocation-service :8083 |
+| `/api/hostels/*`, `/api/rooms/*`, `/api/dashboard/*` | hostel-service :8082 |
+| `/api/notifications/*` | notification-service :8084 |
+| `/api/v1/allocation/*` | algorithm-engine :8090 |
+
+`/api/allocations/*` (plural) belongs to student-service, `/api/allocation/*`
+(singular) to allocation-service. Those are separate path segments, which is
+what makes the routing unambiguous.
+
+### Two caveats
+
+**The services are still directly reachable.** Each publishes its own host port,
+so they can be called without a token and `X-Clerk-User-Id` can be spoofed on a
+direct call. Remove the `ports:` entries from the service definitions to make
+the gateway the only way in; until then treat that header as advisory.
+
+**The legacy password login is now dead.** `POST /api/students/login` sits under
+an authenticated prefix, so it can no longer be reached without a token — correct
+now that Clerk owns identity, but it means the endpoint is unreachable. Delete it
+when convenient.
+
+---
+
 ## API Documentation
 
 ### New Endpoints

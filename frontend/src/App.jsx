@@ -12,6 +12,7 @@ import {
 } from './config/clerk';
 
 import { ProtectedRoute, GuestOnly, RoleRedirect } from './components/auth/RouteGuards';
+import ApiAuthBridge from './components/auth/ApiAuthBridge';
 import BrandMark from './components/common/BrandMark';
 
 import StudentLayout from './layouts/StudentLayout';
@@ -75,6 +76,8 @@ function AppRoutes() {
       localization={clerkLocalization}
     >
       <UserProvider>
+        {/* Hands Clerk's getToken to the non-React API helper in lib/http.js */}
+        <ApiAuthBridge />
         <NotificationProvider>
           <Routes>
             {/* Entry point — routes each visitor by session + role */}

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import AdminLayout from '../../layouts/AdminLayout';
 import { API_BASE_URL, ALGORITHM_API_BASE_URL, ALLOCATION_SERVICE_URL, API_ENDPOINTS } from '../../config/api';
+import { apiFetch } from '../../lib/http';
 
 // ── Icons ──────────────────────────────────────────────────────────────────────
 const CogIcon = ({ className, spin }) => (
@@ -134,7 +135,7 @@ export default function AllocationPage() {
 
   const fetchStrategies = async () => {
     try {
-      const res = await fetch(`${ALGORITHM_API_BASE_URL}${API_ENDPOINTS.ALGO_STRATEGIES}`);
+      const res = await apiFetch(`${ALGORITHM_API_BASE_URL}${API_ENDPOINTS.ALGO_STRATEGIES}`);
       if (!res.ok) return;
       const data = await res.json();
       setStrategies(data.strategies || []);
@@ -147,7 +148,7 @@ export default function AllocationPage() {
 
   const fetchStats = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}${API_ENDPOINTS.ADMIN_STATS}`);
+      const res = await apiFetch(`${API_BASE_URL}${API_ENDPOINTS.ADMIN_STATS}`);
       if (!res.ok) return;
       const data = await res.json();
       setStats({
@@ -161,7 +162,7 @@ export default function AllocationPage() {
   const fetchHistory = useCallback(async () => {
     setHistoryLoading(true);
     try {
-      const res = await fetch(`${ALGORITHM_API_BASE_URL}${API_ENDPOINTS.ALGO_RUNS}`);
+      const res = await apiFetch(`${ALGORITHM_API_BASE_URL}${API_ENDPOINTS.ALGO_RUNS}`);
       if (!res.ok) throw new Error('Engine not reachable');
       const data = await res.json();
       setHistory(data);
@@ -195,7 +196,7 @@ export default function AllocationPage() {
       let usedAsync = false;
 
       try {
-        const res = await fetch(`${ALLOCATION_SERVICE_URL}${API_ENDPOINTS.ALLOCATION_TRIGGER}`, {
+        const res = await apiFetch(`${ALLOCATION_SERVICE_URL}${API_ENDPOINTS.ALLOCATION_TRIGGER}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(reqPayload),
@@ -221,7 +222,7 @@ export default function AllocationPage() {
         let attempts = 0;
         while (attempts < 20) {
           await new Promise(r => setTimeout(r, 1000));
-          const runsRes = await fetch(`${ALGORITHM_API_BASE_URL}${API_ENDPOINTS.ALGO_RUNS}`);
+          const runsRes = await apiFetch(`${ALGORITHM_API_BASE_URL}${API_ENDPOINTS.ALGO_RUNS}`);
           if (runsRes.ok) {
             const runs = await runsRes.json();
             if (runs && runs.length > 0) {
@@ -236,7 +237,7 @@ export default function AllocationPage() {
         }
 
         if (matchedRun) {
-          const detailRes = await fetch(`${ALGORITHM_API_BASE_URL}${API_ENDPOINTS.ALGO_RUN_BY_ID(matchedRun.id)}`);
+          const detailRes = await apiFetch(`${ALGORITHM_API_BASE_URL}${API_ENDPOINTS.ALGO_RUN_BY_ID(matchedRun.id)}`);
           if (detailRes.ok) {
             const detail = await detailRes.json();
             setLatestRun(detail);
@@ -251,7 +252,7 @@ export default function AllocationPage() {
         });
       } else {
         // Direct synchronous fallback
-        const res = await fetch(`${ALGORITHM_API_BASE_URL}${API_ENDPOINTS.ALGO_RUN}`, {
+        const res = await apiFetch(`${ALGORITHM_API_BASE_URL}${API_ENDPOINTS.ALGO_RUN}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -277,7 +278,7 @@ export default function AllocationPage() {
   // ── Approve / Reject ───────────────────────────────────────────────────────
   const handleApprove = async (runId) => {
     try {
-      const res = await fetch(`${ALGORITHM_API_BASE_URL}${API_ENDPOINTS.ALGO_APPROVE(runId)}`, { method: 'POST' });
+      const res = await apiFetch(`${ALGORITHM_API_BASE_URL}${API_ENDPOINTS.ALGO_APPROVE(runId)}`, { method: 'POST' });
       if (!res.ok) throw new Error('Failed to approve');
       await fetchHistory();
       if (detailRun?.id === runId) fetchDetail(runId);
@@ -288,7 +289,7 @@ export default function AllocationPage() {
   const handleReject = async (runId) => {
     if (!confirm('Reject this allocation run? Admin can trigger a new one instead.')) return;
     try {
-      const res = await fetch(`${ALGORITHM_API_BASE_URL}${API_ENDPOINTS.ALGO_REJECT(runId)}`, { method: 'POST' });
+      const res = await apiFetch(`${ALGORITHM_API_BASE_URL}${API_ENDPOINTS.ALGO_REJECT(runId)}`, { method: 'POST' });
       if (!res.ok) throw new Error('Failed to reject');
       await fetchHistory();
       if (detailRun?.id === runId) fetchDetail(runId);
@@ -301,7 +302,7 @@ export default function AllocationPage() {
     setDetailLoading(true);
     setExpandedGroup(null);
     try {
-      const res = await fetch(`${ALGORITHM_API_BASE_URL}${API_ENDPOINTS.ALGO_RUN_BY_ID(runId)}`);
+      const res = await apiFetch(`${ALGORITHM_API_BASE_URL}${API_ENDPOINTS.ALGO_RUN_BY_ID(runId)}`);
       if (!res.ok) throw new Error('Failed to fetch run details');
       const data = await res.json();
       setDetailRun(data);

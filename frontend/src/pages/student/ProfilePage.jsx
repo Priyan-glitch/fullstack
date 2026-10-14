@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useUser } from '../../contexts/UserContext';
 import { API_BASE_URL, API_ENDPOINTS } from '../../config/api';
+import { apiFetch } from '../../lib/http';
 import StudentLayout from '../../layouts/StudentLayout';
 
 // Simple icon components
@@ -159,7 +160,7 @@ export default function ProfilePage() {
     setSuccess('');
 
     try {
-      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.STUDENT_BY_ID(user.id)}`, {
+      const response = await apiFetch(`${API_BASE_URL}${API_ENDPOINTS.STUDENT_BY_ID(user.id)}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

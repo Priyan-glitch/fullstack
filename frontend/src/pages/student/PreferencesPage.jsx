@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../../contexts/UserContext';
 import { API_BASE_URL, API_ENDPOINTS } from '../../config/api';
+import { apiFetch } from '../../lib/http';
 import StudentLayout from '../../layouts/StudentLayout';
 
 // ─── Initial State ────────────────────────────────────────────────────────────
@@ -217,7 +218,7 @@ function RoommateSearchStep({ roomType, selectedRoommates, onUpdateRoommates, cu
     setSelectError('');
     try {
       const genderParam = currentUserGender ? `&gender=${encodeURIComponent(currentUserGender)}` : '';
-      const res = await fetch(`${API_BASE_URL}${API_ENDPOINTS.STUDENTS_SEARCH}?query=${encodeURIComponent(q)}${genderParam}`);
+      const res = await apiFetch(`${API_BASE_URL}${API_ENDPOINTS.STUDENTS_SEARCH}?query=${encodeURIComponent(q)}${genderParam}`);
       if (res.ok) {
         const data = await res.json();
         // Exclude current user, already-selected roommates, and enforce same gender constraint
@@ -555,7 +556,7 @@ export default function PreferencesPage() {
     if (user?.id) {
       fetchPreferences();
       // Fetch complete student profile to guarantee gender is available
-      fetch(`${API_BASE_URL}${API_ENDPOINTS.STUDENT_BY_ID(user.id)}`)
+      apiFetch(`${API_BASE_URL}${API_ENDPOINTS.STUDENT_BY_ID(user.id)}`)
         .then(r => r.ok ? r.json() : null)
         .then(data => {
           if (data) setCurrentUserProfile(data);
@@ -568,7 +569,7 @@ export default function PreferencesPage() {
 
   const fetchPreferences = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.PREFERENCES_BY_STUDENT(user.id)}`);
+      const response = await apiFetch(`${API_BASE_URL}${API_ENDPOINTS.PREFERENCES_BY_STUDENT(user.id)}`);
       if (response.ok) {
         const data = await response.json();
         if (data) {
@@ -578,7 +579,7 @@ export default function PreferencesPage() {
             const ids = data.preferredRoommateIds.split(',').map(id => id.trim()).filter(Boolean);
             const roommateDetails = await Promise.all(
               ids.map(id =>
-                fetch(`${API_BASE_URL}${API_ENDPOINTS.STUDENT_BY_ID(id)}`)
+                apiFetch(`${API_BASE_URL}${API_ENDPOINTS.STUDENT_BY_ID(id)}`)
                   .then(r => r.ok ? r.json() : null)
                   .catch(() => null)
               )
@@ -656,7 +657,7 @@ export default function PreferencesPage() {
         preferredRoommateIds: selectedRoommates.map(r => r.id).join(','),
         submitted: true,
       };
-      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.PREFERENCES_SAVE(user.id)}`, {
+      const response = await apiFetch(`${API_BASE_URL}${API_ENDPOINTS.PREFERENCES_SAVE(user.id)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

@@ -246,11 +246,22 @@ services:
   # ── Gateway ───────────────────────────────────────────────────────────────────
 
   gateway:
-    image: caddy:2
+    # Built from gateway/Dockerfile because the stock caddy image cannot verify
+    # JWTs — the image compiles in the ggicci/caddy-jwt module with xcaddy.
+    build:
+      context: ../../gateway
+      dockerfile: Dockerfile
+    image: stable-roomies-gateway:local
     container_name: stable-roomies-gateway
     ports:
       - "80:80"
       - "443:443"
+    environment:
+      # Repoint these at a production Clerk instance when deploying.
+      CLERK_ISSUER: ${CLERK_ISSUER:-https://exciting-zebra-1231.clerk.accounts.dev}
+      CLERK_JWKS_URL: ${CLERK_JWKS_URL:-https://exciting-zebra-1231.clerk.accounts.dev/.well-known/jwks.json}
+      # Only needed for the Vite dev server; same-origin in production.
+      CORS_ALLOW_ORIGIN: ${CORS_ALLOW_ORIGIN:-http://localhost:5174}
     volumes:
       - ../../gateway/Caddyfile:/etc/caddy/Caddyfile
       - caddy_data:/data

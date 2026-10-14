@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import AdminLayout from '../../layouts/AdminLayout';
 import { HOSTEL_API_BASE_URL, API_ENDPOINTS } from '../../config/api';
 import { percentLabel } from '../../utils/number';
+import { apiFetch } from '../../lib/http';
 
 // Simple icon components
 const HomeIcon = ({ className }) => (
@@ -79,7 +80,7 @@ export default function RoomsPage() {
 
   const fetchHostels = async () => {
     try {
-      const response = await fetch(`${HOSTEL_API_BASE_URL}${API_ENDPOINTS.HOSTELS}`);
+      const response = await apiFetch(`${HOSTEL_API_BASE_URL}${API_ENDPOINTS.HOSTELS}`);
       if (!response.ok) throw new Error('Failed to fetch hostels');
       const data = await response.json();
       setHostels(data);
@@ -92,7 +93,7 @@ export default function RoomsPage() {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`${HOSTEL_API_BASE_URL}${API_ENDPOINTS.ROOMS}`);
+      const response = await apiFetch(`${HOSTEL_API_BASE_URL}${API_ENDPOINTS.ROOMS}`);
       if (!response.ok) throw new Error('Failed to fetch rooms');
       const data = await response.json();
       setRooms(data);
@@ -176,7 +177,7 @@ export default function RoomsPage() {
     if (!window.confirm('Are you sure you want to delete this room? This action cannot be undone.')) return;
     
     try {
-      const response = await fetch(`${HOSTEL_API_BASE_URL}${API_ENDPOINTS.ROOM_BY_ID(roomId)}`, {
+      const response = await apiFetch(`${HOSTEL_API_BASE_URL}${API_ENDPOINTS.ROOM_BY_ID(roomId)}`, {
         method: 'DELETE',
       });
       if (!response.ok) throw new Error('Failed to delete room');
@@ -196,7 +197,7 @@ export default function RoomsPage() {
 
       const newStatus = room.status === 'MAINTENANCE' ? 'AVAILABLE' : 'MAINTENANCE';
 
-      const response = await fetch(`${HOSTEL_API_BASE_URL}${API_ENDPOINTS.ROOM_BY_ID(roomId)}`, {
+      const response = await apiFetch(`${HOSTEL_API_BASE_URL}${API_ENDPOINTS.ROOM_BY_ID(roomId)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -237,7 +238,7 @@ export default function RoomsPage() {
       
       const method = editingRoom ? 'PUT' : 'POST';
 
-      const response = await fetch(url, {
+      const response = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(roomData),

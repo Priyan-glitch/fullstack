@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import AdminLayout from '../../layouts/AdminLayout';
 import { API_BASE_URL, HOSTEL_API_BASE_URL, API_ENDPOINTS } from '../../config/api';
 import { percentLabel } from '../../utils/number';
+import { apiFetch } from '../../lib/http';
 
 // Simple icon components
 const UsersIcon = ({ className }) => (
@@ -85,14 +86,14 @@ export default function AdminDashboard() {
       setError(null);
 
       // Fetch student stats (student-service :8081)
-      const studentResponse = await fetch(`${API_BASE_URL}${API_ENDPOINTS.ADMIN_STATS}`);
+      const studentResponse = await apiFetch(`${API_BASE_URL}${API_ENDPOINTS.ADMIN_STATS}`);
       if (!studentResponse.ok) {
         throw new Error(`student-service responded with ${studentResponse.status}`);
       }
       const studentData = await studentResponse.json();
 
       // Fetch hostel/room stats (hostel-service :8082)
-      const hostelResponse = await fetch(`${HOSTEL_API_BASE_URL}${API_ENDPOINTS.HOSTEL_STATS}`);
+      const hostelResponse = await apiFetch(`${HOSTEL_API_BASE_URL}${API_ENDPOINTS.HOSTEL_STATS}`);
       if (!hostelResponse.ok) {
         throw new Error(`hostel-service responded with ${hostelResponse.status}`);
       }
