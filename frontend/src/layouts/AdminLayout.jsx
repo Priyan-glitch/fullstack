@@ -1,5 +1,8 @@
 import { useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
+import { UserButton } from '@clerk/react';
+import { useUser } from '../contexts/UserContext';
+import BrandMark from '../components/common/BrandMark';
 
 const navItems = [
   {
@@ -58,16 +61,14 @@ const navItems = [
   },
 ];
 
-// Placeholder admin — replace with auth context later
-const currentAdmin = {
-  name: 'Admin',
-  email: 'admin@stableroomies.com',
-  initials: 'A',
-};
-
 export default function AdminLayout({ children }) {
-  const navigate = useNavigate();
+  const { user } = useUser();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const displayName =
+    [user?.firstName, user?.lastName].filter(Boolean).join(' ') ||
+    user?.email ||
+    'Warden';
 
   return (
     <div className="min-h-screen h-screen bg-gray-50 flex flex-col overflow-hidden">
@@ -86,43 +87,20 @@ export default function AdminLayout({ children }) {
           </svg>
         </button>
 
-        {/* Logo */}
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <div className="flex items-center justify-center w-7 h-7 rounded-lg"
-            style={{ background: 'linear-gradient(135deg, #2d5016, #4a7c2c)' }}>
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="white" className="w-3.5 h-3.5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
-            </svg>
-          </div>
-          <div>
-            <span className="text-sm font-semibold text-gray-900">Stable Roomies</span>
-            <span className="ml-2 text-xs px-1.5 py-0.5 bg-green-50 text-green-700 rounded font-medium border border-green-100">Admin</span>
-          </div>
-        </div>
+        <BrandMark size="sm" badge="Admin" />
 
         {/* Spacer */}
         <div className="flex-1" />
 
-        {/* Right side */}
-        <div className="flex items-center gap-2">
-          {/* Admin name + avatar */}
-          <div className="flex items-center gap-2 pl-2 border-l border-gray-100">
-            <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold text-white flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, #2d5016, #4a7c2c)' }}>
-              {currentAdmin.initials}
-            </div>
-            <span className="hidden sm:block text-sm font-medium text-gray-700">{currentAdmin.name}</span>
-            <button
-              onClick={() => navigate('/login')}
-              className="ml-1 p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition cursor-pointer"
-              aria-label="Sign out"
-              title="Sign out"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 9V5.25A2.25 2.25 0 0 1 10.5 3h6a2.25 2.25 0 0 1 2.25 2.25v13.5A2.25 2.25 0 0 1 16.5 21h-6a2.25 2.25 0 0 1-2.25-2.25V15M12 9l3 3m0 0-3 3m3-3H2.25" />
-              </svg>
-            </button>
+        {/* Right side — signed-in identity + Clerk account menu */}
+        <div className="flex items-center gap-2.5 pl-3 border-l border-gray-100">
+          <div className="hidden sm:flex flex-col items-end leading-tight">
+            <span className="text-sm font-medium text-gray-700 max-w-[12rem] truncate">
+              {displayName}
+            </span>
+            <span className="text-[11px] text-gray-400">Warden</span>
           </div>
+          <UserButton />
         </div>
       </header>
 
@@ -150,14 +128,14 @@ export default function AdminLayout({ children }) {
                 className={({ isActive }) =>
                   `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-100
                   ${isActive
-                    ? 'bg-green-50 text-green-800'
+                    ? 'bg-brand-50 text-brand-800'
                     : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800'
                   }`
                 }
               >
                 {({ isActive }) => (
                   <>
-                    <span className={isActive ? 'text-green-700' : 'text-gray-400'}>{item.icon}</span>
+                    <span className={isActive ? 'text-brand-700' : 'text-gray-400'}>{item.icon}</span>
                     {item.label}
                   </>
                 )}

@@ -135,6 +135,90 @@ docker compose -f infrastructure/docker/docker-compose.yml up --build
 
 ---
 
+## Authentication (Clerk)
+
+Authentication is handled entirely by Clerk on the frontend. The React app never
+sees a password; it only ever reads the signed-in identity and the application
+role derived from it.
+
+### 1. Configure the publishable key
+
+```bash
+cd frontend
+cp .env.example .env.local     # then paste your key
+```
+
+```bash
+VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
+```
+
+Get it from the Clerk dashboard → **Configure → API keys**. Publishable keys are
+safe to expose (they ship inside the client bundle); the **secret key must never**
+be placed in `frontend/`.
+
+### 2. Routes
+
+| Route | Access | Behaviour |
+|---|---|---|
+| `/` | public | Sends visitors to their role home, or to `/login` |
+| `/login`, `/signup` | signed out | Clerk components; redirects signed-in users away |
+| `/student/*` | `student` | Redirects wardens to `/admin/dashboard` |
+| `/admin/*` | `admin` | Redirects students to `/student/dashboard` |
+| anything else | public | Branded 404 |
+
+Guarding lives in [`frontend/src/components/auth/RouteGuards.jsx`](frontend/src/components/auth/RouteGuards.jsx).
+Hitting a protected route while signed out sends you to
+`/login?redirect_url=…`, so Clerk returns you to the page you wanted after sign-in.
+
+### 3. Roles
+
+The role is resolved in [`frontend/src/config/clerk.js`](frontend/src/config/clerk.js)
+in this order:
+
+1. `publicMetadata.role` — recommended, set from the Clerk dashboard
+2. `unsafeMetadata.role` — self-assigned at sign-up
+3. `VITE_ADMIN_EMAILS` — comma-separated dev escape hatch
+4. `student` — default
+
+Accepted admin values are `admin`, `warden`, `staff` and `administrator`.
+
+**To make a user a warden**, open the Clerk dashboard → **Users → select the user
+→ Metadata → Public** and set:
+
+```json
+{ "role": "admin" }
+```
+
+For local development you can skip the dashboard entirely:
+
+```bash
+# frontend/.env.local
+VITE_ADMIN_EMAILS=you@campus.edu
+```
+
+### 4. Linking Clerk users to student records
+
+The backend owns student data and keys it by its own numeric id, so
+[`UserContext`](frontend/src/contexts/UserContext.jsx) resolves the signed-in
+email against `GET /api/students/email/{email}` and exposes that record as
+`user`. Every existing page keeps working unchanged because `user.id` stays the
+numeric id the student-service expects.
+
+If student-service is unreachable or has no matching record, the context falls
+back to the Clerk identity so the UI still renders instead of hanging.
+
+### 5. Sign out and account management
+
+Both app shells use Clerk's `<UserButton />`. It opens an in-app account menu
+(manage account → Clerk `<UserProfile />` modal, sign out → `/login`) and is
+themed by the shared `clerkAppearance` object.
+
+> Clerk's prebuilt UI is bundled via `@clerk/ui` rather than loaded from Clerk's
+> CDN at runtime, so the auth screens render without a second network round-trip.
+
+
+---
+
 ## API Documentation
 
 ### New Endpoints
@@ -192,11 +276,22 @@ GET /api/allocations/health
    - Shows dynamic recent activity
    - Loading states and error handling
 
+4. **Clerk Authentication (Frontend)**
+   - Sign-in and sign-up screens at `/login` and `/signup`, themed to the brand
+   - Role-aware route guards for every student and admin route
+   - Clerk `<UserButton />` account menu replaces the placeholder header identity
+   - Student records resolved by email so existing API calls are unchanged
+   - 404 page and empty states for the not-yet-built `Requests` routes
+
 ### ⏳ Pending
 
 1. **PreferencesPage UI** - Form to collect and submit preferences
 2. **Algorithm Engine** - Compatibility scoring and matching logic
 3. **Database Persistence** - Store allocations in database
 4. **Admin Allocation Trigger** - Interface to run allocation
+5. **Backend JWT verification** - Validate Clerk session tokens in the Spring services
+   (the frontend is authenticated today, but the APIs are still open)
+6. **Remove `password` from `StudentDTO`** — the student-service still serialises
+   the password field on `/api/students*`; with Clerk in place it is no longer needed
 
 ---
