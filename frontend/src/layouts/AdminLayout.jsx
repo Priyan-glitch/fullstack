@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
+import NotificationBell from '../components/NotificationBell';
 
 const navItems = [
   {
@@ -105,6 +106,9 @@ export default function AdminLayout({ children }) {
 
         {/* Right side */}
         <div className="flex items-center gap-2">
+          {/* Real-time Notification Bell */}
+          <NotificationBell />
+
           {/* Admin name + avatar */}
           <div className="flex items-center gap-2 pl-2 border-l border-gray-100">
             <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold text-white flex-shrink-0"
