@@ -369,11 +369,15 @@ export default function StudentDashboard() {
   };
 
   const isPrefsSubmitted = preferences?.submitted || false;
-  const roomTypeFormatted = preferences?.roomType === '2_SHARING' 
-    ? '2-Sharing' 
-    : preferences?.roomType === '3_SHARING' 
-      ? '3-Sharing' 
-      : (preferences?.roomType || 'Not Selected');
+  const roomTypeFormatted = preferences?.roomType === 'INDIVIDUAL'
+    ? 'Individual'
+    : preferences?.roomType === '2_SHARING' 
+      ? '2-Sharing' 
+      : preferences?.roomType === '3_SHARING' 
+        ? '3-Sharing' 
+        : preferences?.roomType === '4_SHARING'
+          ? '4-Sharing'
+          : (preferences?.roomType || 'Not Selected');
 
   const acFormatted = formatAcPref(preferences?.acPreference);
   const roomPrefDisplay = preferences?.roomType

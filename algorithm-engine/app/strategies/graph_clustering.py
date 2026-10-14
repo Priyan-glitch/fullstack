@@ -135,9 +135,16 @@ def _get_explicit_roommate_ids(student: StudentData) -> List[int]:
 
 
 def _room_type_key(student: StudentData) -> str:
-    """Normalise to '2_SHARING' or '3_SHARING'."""
+    """Normalise to 'INDIVIDUAL', '2_SHARING', '3_SHARING', or '4_SHARING'."""
     rt = (student.preference.roomType or "2_SHARING") if student.preference else "2_SHARING"
-    return "3_SHARING" if "3" in rt else "2_SHARING"
+    rt_upper = rt.upper()
+    if "1" in rt_upper or "INDIVIDUAL" in rt_upper or "SINGLE" in rt_upper:
+        return "INDIVIDUAL"
+    if "4" in rt_upper:
+        return "4_SHARING"
+    if "3" in rt_upper:
+        return "3_SHARING"
+    return "2_SHARING"
 
 
 def _ac_preference(student: StudentData) -> str:
@@ -200,7 +207,14 @@ class GraphClusteringStrategy(AlgorithmStrategy):
         available_rooms = list(rooms)   # mutable copy
 
         for (gender, room_type), bucket in buckets.items():
-            group_size = 3 if room_type == "3_SHARING" else 2
+            if room_type == "INDIVIDUAL":
+                group_size = 1
+            elif room_type == "4_SHARING":
+                group_size = 4
+            elif room_type == "3_SHARING":
+                group_size = 3
+            else:
+                group_size = 2
             logger.info("  Bucket (%s, %s): %d students", gender, room_type, len(bucket))
 
             groups, unallocated = self._cluster_bucket(bucket, group_size, gender, room_type)
@@ -369,6 +383,21 @@ class GraphClusteringStrategy(AlgorithmStrategy):
             logger.warning("    Not enough students (%d) to form a group of %d",
                            len(students), group_size)
             return [], [s.id for s in students]
+
+        if group_size == 1:
+            groups = [
+                RoommateGroup(
+                    student_ids=[s.id],
+                    student_names=[s.full_name],
+                    room_type=room_type,
+                    gender=gender,
+                    compatibility_score=100.0,
+                    has_explicit_preference=False,
+                    notes="Single occupancy room",
+                )
+                for s in students
+            ]
+            return groups, []
 
         id_to_student: Dict[int, StudentData] = {s.id: s for s in students}
         explicit_pairs: set = set()

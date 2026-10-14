@@ -103,7 +103,7 @@ const fmtYear = (y) => {
 export default function AllocationPage() {
   const [tab, setTab] = useState('run');          // 'run' | 'history'
   const [strategies, setStrategies] = useState([]);
-  const [selectedStrategy, setSelectedStrategy] = useState('graph_clustering');
+  const [selectedStrategy, setSelectedStrategy] = useState('preference_queue_louvain');
   const [selectedYear, setSelectedYear] = useState('ALL'); // 'ALL' | '1' | '2' | '3' | '4'
   const [runNotes, setRunNotes] = useState('');
 
@@ -139,10 +139,9 @@ export default function AllocationPage() {
       if (!res.ok) return;
       const data = await res.json();
       setStrategies(data.strategies || []);
-      setSelectedStrategy(data.default || 'graph_clustering');
+      setSelectedStrategy(data.default || 'preference_queue_louvain');
     } catch {
-      // Engine not running yet — show strategies as static fallback
-      setStrategies([{ name: 'graph_clustering', description: 'Graph-Based Clustering with Louvain community detection' }]);
+      setSelectedStrategy('preference_queue_louvain');
     }
   };
 
@@ -400,37 +399,6 @@ export default function AllocationPage() {
                   {/* <p className="text-sm text-gray-500 mt-0.5">
                     Tasks are dispatched via <strong>RabbitMQ</strong> to the background worker and processed asynchronously by the Algorithm Engine.
                   </p> */}
-                </div>
-              </div>
-
-              {/* Strategy selector */}
-              <div className="mb-4">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Algorithm Strategy</label>
-                <div className="space-y-2">
-                  {strategies.map(s => (
-                    <label key={s.name}
-                      className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
-                        selectedStrategy === s.name
-                          ? 'border-green-300 bg-green-50'
-                          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="strategy"
-                        value={s.name}
-                        checked={selectedStrategy === s.name}
-                        onChange={() => setSelectedStrategy(s.name)}
-                        className="mt-0.5 accent-green-600"
-                      />
-                      <div>
-                        <p className="text-sm font-semibold text-gray-800 capitalize">
-                          {s.name.replace(/_/g, ' ')}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-0.5">{s.description}</p>
-                      </div>
-                    </label>
-                  ))}
                 </div>
               </div>
 

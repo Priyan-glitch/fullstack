@@ -71,6 +71,15 @@ export const API_ENDPOINTS = {
   ROOMS: '/api/rooms',
   ROOM_BY_ID: (id) => `/api/rooms/${id}`,
   ROOMS_BY_HOSTEL: (hostelId) => `/api/rooms/hostel/${hostelId}`,
+  ROOMS_SYNC_INVENTORY: (hostelId) => `/api/rooms/hostel/${hostelId}/sync-inventory`,
+
+  // Room Type Availability Config
+  ROOM_TYPE_CONFIG: '/api/room-type-config',
+  ROOM_TYPE_CONFIG_AVAILABLE: '/api/room-type-config/available',
+  ROOM_TYPE_CONFIG_BY_ID: (id) => `/api/room-type-config/${id}`,
+  ROOM_TYPE_CONFIG_TOGGLE: (id) => `/api/room-type-config/${id}/toggle`,
+  ROOM_TYPE_CONFIG_BULK: '/api/room-type-config/bulk',
+  ROOM_TYPE_CONFIG_SYNC: '/api/room-type-config/sync',
 
   // Notifications (port 8084)
   NOTIFICATIONS_FOR_USER: (userId) => `/api/notifications/${userId}`,

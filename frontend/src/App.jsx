@@ -23,6 +23,7 @@ import StudentsPage from './pages/admin/StudentsPage';
 import HostelsPage from './pages/admin/HostelsPage';
 import RoomsPage from './pages/admin/RoomsPage';
 import AdminAllocationPage from './pages/admin/AllocationPage';
+import RoomAvailabilityPage from './pages/admin/RoomAvailabilityPage';
 
 function AppRoutes() {
   return (
@@ -143,6 +144,14 @@ function AppRoutes() {
               element={
                 <ProtectedRoute allow={['admin']}>
                   <AdminAllocationPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/room-availability"
+              element={
+                <ProtectedRoute allow={['admin']}>
+                  <RoomAvailabilityPage />
                 </ProtectedRoute>
               }
             />

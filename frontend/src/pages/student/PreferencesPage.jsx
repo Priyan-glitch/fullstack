@@ -1,14 +1,17 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../../contexts/UserContext';
-import { API_BASE_URL, API_ENDPOINTS } from '../../config/api';
 import { apiFetch } from '../../lib/http';
+import { API_BASE_URL, HOSTEL_API_BASE_URL, API_ENDPOINTS } from '../../config/api';
 import StudentLayout from '../../layouts/StudentLayout';
 
 // ─── Initial State ────────────────────────────────────────────────────────────
 
 const initialPreferences = {
   roomType: null,
+  roomTypePreference1: null,
+  roomTypePreference2: null,
+  roomTypePreference3: null,
   acPreference: null,            // 'AC', 'NON_AC', 'BOTH'
   preferredRoommateIds: '',      // comma-separated IDs stored as string
   sleepTime: null,
@@ -76,6 +79,16 @@ function ProgressBar({ currentStep, totalSteps }) {
 
 function RoomTypeCard({ type, selected, onSelect }) {
   const configs = {
+    'INDIVIDUAL': {
+      number: '1',
+      label: 'Individual',
+      description: 'Single occupancy room',
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-7 h-7">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+        </svg>
+      ),
+    },
     '2_SHARING': {
       number: '2',
       label: 'Sharing',
@@ -96,9 +109,20 @@ function RoomTypeCard({ type, selected, onSelect }) {
         </svg>
       ),
     },
+    '4_SHARING': {
+      number: '4',
+      label: 'Sharing',
+      description: 'Room for 4 students',
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-7 h-7">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
+        </svg>
+      ),
+    },
   };
 
   const config = configs[type];
+  if (!config) return null;
   const isSelected = selected === type;
 
   return (
@@ -188,7 +212,11 @@ function AcOptionCard({ type, title, description, selected, onSelect }) {
 // ─── Roommate Search Step ─────────────────────────────────────────────────────
 
 function RoommateSearchStep({ roomType, selectedRoommates, onUpdateRoommates, currentUserId, currentUserGender }) {
-  const maxSlots = roomType === '2_SHARING' ? 1 : 2;
+  // maxSlots: INDIVIDUAL=0, 2_SHARING=1, 3_SHARING=2, 4_SHARING=3
+  const maxSlots = roomType === 'INDIVIDUAL' ? 0
+    : roomType === '2_SHARING' ? 1
+    : roomType === '4_SHARING' ? 3
+    : 2; // 3_SHARING default
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -276,6 +304,25 @@ function RoommateSearchStep({ roomType, selectedRoommates, onUpdateRoommates, cu
   const slotsLeft = maxSlots - selectedRoommates.length;
   const isMale = currentUserGender?.toLowerCase() === 'male';
   const isFemale = currentUserGender?.toLowerCase() === 'female';
+
+  if (roomType === 'INDIVIDUAL' || maxSlots === 0) {
+    return (
+      <div className="py-8 text-center bg-gray-50 rounded-2xl border border-gray-100 p-8 space-y-4">
+        <div className="w-16 h-16 mx-auto bg-green-100 text-green-700 rounded-2xl flex items-center justify-center">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+          </svg>
+        </div>
+        <div>
+          <h3 className="text-base font-bold text-gray-900">Single Occupancy (Individual Room)</h3>
+          <p className="text-sm text-gray-500 max-w-md mx-auto mt-1">
+            You have selected an <strong>Individual</strong> room. Since you will have a private room to yourself, roommate selection is not applicable.
+          </p>
+        </div>
+        <p className="text-xs text-gray-400">Click &ldquo;Next Step&rdquo; below to continue with your lifestyle preferences.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -551,6 +598,16 @@ export default function PreferencesPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  // Room type availability from admin configuration
+  const [availableRoomTypeConfigs, setAvailableRoomTypeConfigs] = useState([]);
+
+  // Fetch room type availability config (runs once on mount)
+  useEffect(() => {
+    fetch(`${HOSTEL_API_BASE_URL}${API_ENDPOINTS.ROOM_TYPE_CONFIG_AVAILABLE}`)
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setAvailableRoomTypeConfigs(data))
+      .catch(() => setAvailableRoomTypeConfigs([]));
+  }, []);
 
   useEffect(() => {
     if (user?.id) {
@@ -565,6 +622,7 @@ export default function PreferencesPage() {
     }
   }, [user]);
 
+
   const currentUserGender = currentUserProfile?.gender || user?.gender;
 
   const fetchPreferences = async () => {
@@ -573,7 +631,14 @@ export default function PreferencesPage() {
       if (response.ok) {
         const data = await response.json();
         if (data) {
-          setPreferences({ ...initialPreferences, ...data });
+          setPreferences({
+            ...initialPreferences,
+            ...data,
+            roomType: data.roomTypePreference1 || data.roomType || null,
+            roomTypePreference1: data.roomTypePreference1 || data.roomType || null,
+            roomTypePreference2: data.roomTypePreference2 || null,
+            roomTypePreference3: data.roomTypePreference3 || null,
+          });
           // If preferredRoommateIds exist, fetch the student details for display
           if (data.preferredRoommateIds && data.preferredRoommateIds.trim()) {
             const ids = data.preferredRoommateIds.split(',').map(id => id.trim()).filter(Boolean);
@@ -599,13 +664,90 @@ export default function PreferencesPage() {
     setPreferences(prev => ({ ...prev, [key]: value }));
   };
 
+  const ALL_ROOM_TYPES = ['INDIVIDUAL', '2_SHARING', '3_SHARING', '4_SHARING'];
+  const enabledConfigs = availableRoomTypeConfigs.filter(c => c.available);
+  const availableSharingTypes = availableRoomTypeConfigs.length > 0
+    ? ALL_ROOM_TYPES.filter(rt => enabledConfigs.some(c => c.roomType === rt))
+    : ALL_ROOM_TYPES;
+
+  const selectedTypeConfigs = availableRoomTypeConfigs.length > 0
+    ? enabledConfigs.filter(c => c.roomType === (preferences.roomTypePreference1 || preferences.roomType))
+    : [];
+
+  const isAcAvailable = availableRoomTypeConfigs.length === 0 || selectedTypeConfigs.some(c => c.acType === 'AC');
+  const isNonAcAvailable = availableRoomTypeConfigs.length === 0 || selectedTypeConfigs.some(c => c.acType === 'NON_AC');
+  const isBothAllowed = isAcAvailable && isNonAcAvailable;
+
+  // Auto-align roomType when availability configs load
+  useEffect(() => {
+    if (availableRoomTypeConfigs.length > 0 && availableSharingTypes.length > 0) {
+      if (!preferences.roomType || !availableSharingTypes.includes(preferences.roomType)) {
+        updatePreference('roomType', availableSharingTypes[0]);
+        updatePreference('roomTypePreference1', availableSharingTypes[0]);
+      }
+    }
+  }, [availableRoomTypeConfigs, availableSharingTypes, preferences.roomType]);
+
+  // Auto-align acPreference when roomType or available configs change
+  useEffect(() => {
+    const activeType = preferences.roomTypePreference1 || preferences.roomType;
+    if (availableRoomTypeConfigs.length > 0 && activeType) {
+      const typeAcConfigs = enabledConfigs.filter(c => c.roomType === activeType);
+      const acs = typeAcConfigs.map(c => c.acType);
+      if (acs.length > 0) {
+        if (!preferences.acPreference) {
+          updatePreference('acPreference', acs.length > 1 ? 'BOTH' : acs[0]);
+        } else if (preferences.acPreference === 'BOTH' && acs.length < 2) {
+          updatePreference('acPreference', acs[0]);
+        } else if (preferences.acPreference !== 'BOTH' && !acs.includes(preferences.acPreference)) {
+          updatePreference('acPreference', acs[0]);
+        }
+      }
+    }
+  }, [preferences.roomType, preferences.roomTypePreference1, availableRoomTypeConfigs]);
+
   // When room type changes, clear selected roommates if over new limit
   const handleRoomTypeSelect = (type) => {
     updatePreference('roomType', type);
-    const newMax = type === '2_SHARING' ? 1 : 2;
-    if (selectedRoommates.length > newMax) {
-      setSelectedRoommates(selectedRoommates.slice(0, newMax));
+    updatePreference('roomTypePreference1', type);
+    if (preferences.roomTypePreference2 === type) {
+      updatePreference('roomTypePreference2', null);
     }
+    if (preferences.roomTypePreference3 === type) {
+      updatePreference('roomTypePreference3', null);
+    }
+    const newMax = type === 'INDIVIDUAL' ? 0
+      : type === '2_SHARING' ? 1
+      : type === '4_SHARING' ? 3
+      : 2; // 3_SHARING
+    if (selectedRoommates.length > newMax) {
+      const trimmed = selectedRoommates.slice(0, newMax);
+      setSelectedRoommates(trimmed);
+      updatePreference('preferredRoommateIds', trimmed.map(r => r.id).join(','));
+    }
+    // Also adjust acPreference if not supported for newly selected room type
+    if (availableRoomTypeConfigs.length > 0) {
+      const typeAcConfigs = enabledConfigs.filter(c => c.roomType === type);
+      const acs = typeAcConfigs.map(c => c.acType);
+      if (acs.length > 0) {
+        if (preferences.acPreference === 'BOTH' && acs.length < 2) {
+          updatePreference('acPreference', acs[0]);
+        } else if (preferences.acPreference && !acs.includes(preferences.acPreference) && preferences.acPreference !== 'BOTH') {
+          updatePreference('acPreference', acs[0]);
+        }
+      }
+    }
+  };
+
+  const handlePref2Select = (type) => {
+    updatePreference('roomTypePreference2', type);
+    if (preferences.roomTypePreference3 === type) {
+      updatePreference('roomTypePreference3', null);
+    }
+  };
+
+  const handlePref3Select = (type) => {
+    updatePreference('roomTypePreference3', type);
   };
 
   const handleRoommatesUpdate = (roommates) => {
@@ -617,7 +759,7 @@ export default function PreferencesPage() {
   const TOTAL_STEPS = 5;
 
   const canProceed = () => {
-    if (currentStep === 1) return preferences.roomType !== null && preferences.acPreference !== null;
+    if (currentStep === 1) return (preferences.roomType || preferences.roomTypePreference1) !== null && preferences.acPreference !== null;
     if (currentStep === 2) return true; // Optional step — always can proceed
     if (currentStep === 3) {
       return preferences.sleepTime !== null && 
@@ -652,12 +794,25 @@ export default function PreferencesPage() {
     setSubmitting(true);
     setSubmitError('');
     try {
+      const studentId = Number(user?.id);
+      if (!user?.id || isNaN(studentId) || (typeof user.id === 'string' && user.id.startsWith('user_'))) {
+        setSubmitError('Student profile is still syncing with backend. Please refresh the page and try again.');
+        setSubmitting(false);
+        return;
+      }
+
+      const primaryRoomType = preferences.roomTypePreference1 || preferences.roomType;
       const payload = {
         ...preferences,
+        studentId: studentId,
+        roomType: primaryRoomType,
+        roomTypePreference1: primaryRoomType,
+        roomTypePreference2: preferences.roomTypePreference2 || null,
+        roomTypePreference3: preferences.roomTypePreference3 || null,
         preferredRoommateIds: selectedRoommates.map(r => r.id).join(','),
         submitted: true,
       };
-      const response = await apiFetch(`${API_BASE_URL}${API_ENDPOINTS.PREFERENCES_SAVE(user.id)}`, {
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.PREFERENCES_SAVE(studentId)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -682,7 +837,10 @@ export default function PreferencesPage() {
     if (v === null || v === undefined) return '—';
     
     const formats = {
-      roomType: { '2_SHARING': '2-Sharing', '3_SHARING': '3-Sharing' },
+      roomType: { 'INDIVIDUAL': 'Individual (1 Bed)', '2_SHARING': '2-Sharing', '3_SHARING': '3-Sharing', '4_SHARING': '4-Sharing' },
+      roomTypePreference1: { 'INDIVIDUAL': 'Individual (1 Bed)', '2_SHARING': '2-Sharing', '3_SHARING': '3-Sharing', '4_SHARING': '4-Sharing' },
+      roomTypePreference2: { 'INDIVIDUAL': 'Individual (1 Bed)', '2_SHARING': '2-Sharing', '3_SHARING': '3-Sharing', '4_SHARING': '4-Sharing' },
+      roomTypePreference3: { 'INDIVIDUAL': 'Individual (1 Bed)', '2_SHARING': '2-Sharing', '3_SHARING': '3-Sharing', '4_SHARING': '4-Sharing' },
       acPreference: { 'AC': 'AC Room', 'NON_AC': 'Non-AC Room', 'BOTH': 'Both (AC / Non-AC)' },
       sleepTime: { 'BEFORE_10': 'Before 10 PM', '10_TO_12': '10 PM – 12 AM', 'AFTER_12': 'After 12 AM' },
       wakeUpTime: { 'BEFORE_6': 'Before 6 AM', '6_TO_8': '6 AM – 8 AM', '8_TO_10': '8 AM – 10 AM', 'AFTER_10': 'After 10 AM' },
@@ -783,7 +941,7 @@ export default function PreferencesPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div className="flex items-center gap-3.5 p-3.5 rounded-xl bg-gray-50 border border-gray-100">
                     <div className="w-10 h-10 rounded-xl bg-green-100 text-green-800 font-bold text-lg flex items-center justify-center flex-shrink-0">
-                      {preferences.roomType === '2_SHARING' ? '2' : preferences.roomType === '3_SHARING' ? '3' : '—'}
+                      {preferences.roomType === 'INDIVIDUAL' ? '1' : preferences.roomType === '2_SHARING' ? '2' : preferences.roomType === '3_SHARING' ? '3' : preferences.roomType === '4_SHARING' ? '4' : '—'}
                     </div>
                     <div>
                       <p className="text-xs text-gray-500">Sharing Capacity</p>
@@ -938,59 +1096,169 @@ export default function PreferencesPage() {
           {/* Step 1: Room Preferences (Sharing & AC) */}
           {currentStep === 1 && (
             <div className="space-y-8">
-              {/* Question 1: Sharing Type */}
+              {/* Question 1: Sharing Type (1st Preference) */}
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <label className="text-sm font-semibold text-gray-900">
-                    1. Preferred Sharing Type
-                  </label>
+                  <div>
+                    <label className="text-sm font-semibold text-gray-900">
+                      1. Preferred Sharing Type (1st Choice)
+                    </label>
+                    <p className="text-xs text-gray-500 mt-0.5">Your primary room category preference</p>
+                  </div>
                   <span className="text-xs text-gray-400">Required</span>
                 </div>
-                <div className="flex gap-4">
-                  <RoomTypeCard
-                    type="2_SHARING"
-                    selected={preferences.roomType}
-                    onSelect={handleRoomTypeSelect}
-                  />
-                  <RoomTypeCard
-                    type="3_SHARING"
-                    selected={preferences.roomType}
-                    onSelect={handleRoomTypeSelect}
-                  />
-                </div>
+                {availableSharingTypes.length > 0 ? (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {availableSharingTypes.map(type => (
+                      <RoomTypeCard
+                        key={type}
+                        type={type}
+                        selected={preferences.roomTypePreference1 || preferences.roomType}
+                        onSelect={handleRoomTypeSelect}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+                    No room types are currently open for allocation. Please check back later or contact administration.
+                  </div>
+                )}
               </div>
 
-              {/* Question 2: AC Preference */}
+              {/* Question 2: Fallback Sharing Preferences (Strategy 2 Priority Queue) */}
+              {availableSharingTypes.length > 1 && (
+                <div className="border-t border-gray-100 pt-6">
+                  <div className="mb-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-semibold text-gray-900">
+                        2. Fallback Sharing Preferences
+                      </label>
+                      <span className="text-xs text-gray-400">Optional Fallbacks</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      If rooms in your 1st choice are filled by earlier applicants, the allocation algorithm will automatically place you into your 2nd or 3rd preference in order.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* 2nd Preference */}
+                    <div className="p-4 rounded-xl border border-gray-200 bg-gray-50/60">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                          2nd Preference 
+                        </span>
+                        {preferences.roomTypePreference2 && (
+                          <button
+                            type="button"
+                            onClick={() => handlePref2Select(null)}
+                            className="text-xs text-red-500 hover:text-red-700 font-medium cursor-pointer"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        {availableSharingTypes
+                          .filter(t => t !== (preferences.roomTypePreference1 || preferences.roomType))
+                          .map(type => (
+                            <button
+                              key={type}
+                              type="button"
+                              onClick={() => handlePref2Select(type)}
+                              className={`py-2 px-2.5 rounded-lg text-xs font-medium border text-center transition-all cursor-pointer ${
+                                preferences.roomTypePreference2 === type
+                                  ? 'border-green-600 bg-green-50 text-green-800 font-semibold shadow-xs'
+                                  : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-100 hover:border-gray-300'
+                              }`}
+                            >
+                              {type === 'INDIVIDUAL' ? 'Individual' : type.replace('_', '-')}
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+
+                    {/* 3rd Preference */}
+                    <div className="p-4 rounded-xl border border-gray-200 bg-gray-50/60">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                          3rd Preference 
+                        </span>
+                        {preferences.roomTypePreference3 && (
+                          <button
+                            type="button"
+                            onClick={() => handlePref3Select(null)}
+                            className="text-xs text-red-500 hover:text-red-700 font-medium cursor-pointer"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        {availableSharingTypes
+                          .filter(t => t !== (preferences.roomTypePreference1 || preferences.roomType) && t !== preferences.roomTypePreference2)
+                          .map(type => (
+                            <button
+                              key={type}
+                              type="button"
+                              onClick={() => handlePref3Select(type)}
+                              className={`py-2 px-2.5 rounded-lg text-xs font-medium border text-center transition-all cursor-pointer ${
+                                preferences.roomTypePreference3 === type
+                                  ? 'border-green-600 bg-green-50 text-green-800 font-semibold shadow-xs'
+                                  : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-100 hover:border-gray-300'
+                              }`}
+                            >
+                              {type === 'INDIVIDUAL' ? 'Individual' : type.replace('_', '-')}
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Question 3: AC Preference */}
               <div className="border-t border-gray-100 pt-6">
                 <div className="flex items-center justify-between mb-3">
                   <label className="text-sm font-semibold text-gray-900">
-                    2. Air Conditioning (AC) Preference
+                    3. Air Conditioning (AC) Preference
                   </label>
                   <span className="text-xs text-gray-400">Required</span>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-                  <AcOptionCard
-                    type="AC"
-                    title="AC Room"
-                    description="Air-conditioned room for cooler temperature control"
-                    selected={preferences.acPreference === 'AC'}
-                    onSelect={() => updatePreference('acPreference', 'AC')}
-                  />
-                  <AcOptionCard
-                    type="NON_AC"
-                    title="Non-AC Room"
-                    description="Standard well-ventilated room with ceiling fans"
-                    selected={preferences.acPreference === 'NON_AC'}
-                    onSelect={() => updatePreference('acPreference', 'NON_AC')}
-                  />
-                  <AcOptionCard
-                    type="BOTH"
-                    title="Both (No Preference)"
-                    description="Comfortable with either AC or Non-AC room depending on availability"
-                    selected={preferences.acPreference === 'BOTH'}
-                    onSelect={() => updatePreference('acPreference', 'BOTH')}
-                  />
-                </div>
+                {(!isAcAvailable && !isNonAcAvailable) ? (
+                  <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+                    No AC options are currently open for this room type.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                    {isAcAvailable && (
+                      <AcOptionCard
+                        type="AC"
+                        title="AC Room"
+                        description="Air-conditioned room for cooler temperature control"
+                        selected={preferences.acPreference === 'AC'}
+                        onSelect={() => updatePreference('acPreference', 'AC')}
+                      />
+                    )}
+                    {isNonAcAvailable && (
+                      <AcOptionCard
+                        type="NON_AC"
+                        title="Non-AC Room"
+                        description="Standard well-ventilated room with ceiling fans"
+                        selected={preferences.acPreference === 'NON_AC'}
+                        onSelect={() => updatePreference('acPreference', 'NON_AC')}
+                      />
+                    )}
+                    {isBothAllowed && (
+                      <AcOptionCard
+                        type="BOTH"
+                        title="Both (No Preference)"
+                        description="Comfortable with either AC or Non-AC room depending on availability"
+                        selected={preferences.acPreference === 'BOTH'}
+                        onSelect={() => updatePreference('acPreference', 'BOTH')}
+                      />
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1160,7 +1428,13 @@ export default function PreferencesPage() {
                 <span><strong>Important Notice:</strong> Once submitted, your preferences cannot be edited or modified. Please review all selections carefully before submitting.</span>
               </div>
               <div className="bg-gray-50 rounded-lg p-5 mb-4">
-                <ReviewItem label="Room Type" value={formatValue('roomType')} />
+                <ReviewItem label="1st Choice Room Type" value={formatValue('roomTypePreference1') !== '—' ? formatValue('roomTypePreference1') : formatValue('roomType')} />
+                {preferences.roomTypePreference2 && (
+                  <ReviewItem label="2nd Choice (Fallback)" value={formatValue('roomTypePreference2')} />
+                )}
+                {preferences.roomTypePreference3 && (
+                  <ReviewItem label="3rd Choice (Fallback)" value={formatValue('roomTypePreference3')} />
+                )}
                 <ReviewItem label="AC Preference" value={formatValue('acPreference')} />
                 <ReviewItem
                   label="Preferred Roommates"

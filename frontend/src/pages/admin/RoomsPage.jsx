@@ -66,12 +66,18 @@ export default function RoomsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [hostelFilter, setHostelFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
+  const [acFilter, setAcFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
 
   const [rooms, setRooms] = useState([]);
   const [hostels, setHostels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const isRoomAc = (room) => {
+    if (!room?.amenities) return false;
+    return /\b(AC|A\/C|AIR[\s-]CONDITION(ING|ER)?)\b/i.test(room.amenities);
+  };
 
   useEffect(() => {
     fetchHostels();
@@ -113,14 +119,24 @@ export default function RoomsPage() {
     roomType: '2-Sharing',
     capacity: 2,
     currentOccupancy: 0,
-    available: true,
+    status: 'AVAILABLE',
+    isAc: false,
   });
 
   // Filter rooms
   const filteredRooms = rooms.filter(room => {
     const matchesSearch = room.roomNumber.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesHostel = hostelFilter === 'all' || room.hostelId?.toString() === hostelFilter;
-    const matchesType = typeFilter === 'all' || room.roomType === typeFilter;
+    const matchesAc = acFilter === 'all' || (acFilter === 'AC' ? isRoomAc(room) : !isRoomAc(room));
+    const matchesType = typeFilter === 'all' || (() => {
+      const rt = (room.roomType || '').toUpperCase().replace('-', '_');
+      const tf = typeFilter.toUpperCase().replace('-', '_');
+      if (tf.includes('INDIVIDUAL') || tf.includes('1')) return rt.includes('INDIVIDUAL') || rt.includes('1') || room.capacity === 1;
+      if (tf.includes('4')) return rt.includes('4') || room.capacity === 4;
+      if (tf.includes('3')) return rt.includes('3') || room.capacity === 3;
+      if (tf.includes('2')) return rt.includes('2') || room.capacity === 2;
+      return room.roomType === typeFilter;
+    })();
     
     // Status filter logic
     let matchesStatus = true;
@@ -140,7 +156,7 @@ export default function RoomsPage() {
       }
     }
 
-    return matchesSearch && matchesHostel && matchesType && matchesStatus;
+    return matchesSearch && matchesHostel && matchesType && matchesAc && matchesStatus;
   });
 
   const handleAdd = () => {
@@ -154,8 +170,26 @@ export default function RoomsPage() {
       capacity: 2,
       currentOccupancy: 0,
       status: 'AVAILABLE',
+      isAc: false,
     });
     setShowModal(true);
+  };
+
+  const normalizeRoomType = (rt) => {
+    if (!rt) return '2-Sharing';
+    const u = rt.toUpperCase().replace('-', '_');
+    if (u.includes('INDIVIDUAL') || u.includes('1')) return 'Individual';
+    if (u.includes('4')) return '4-Sharing';
+    if (u.includes('3')) return '3-Sharing';
+    return '2-Sharing';
+  };
+
+  const toDbRoomType = (rt) => {
+    const u = (rt || '').toUpperCase().replace('-', '_');
+    if (u.includes('INDIVIDUAL') || u.includes('1')) return 'INDIVIDUAL';
+    if (u.includes('4')) return '4-SHARING';
+    if (u.includes('3')) return '3-SHARING';
+    return '2-SHARING';
   };
 
   const handleEdit = (room) => {
@@ -164,11 +198,12 @@ export default function RoomsPage() {
       roomNumber: room.roomNumber,
       hostelId: room.hostelId?.toString() || '',
       block: room.block || '',
-      floor: room.floor?.toString() || '',
-      roomType: room.roomType || '2-Sharing',
+      floor: room.floor !== undefined && room.floor !== null ? room.floor.toString() : '1',
+      roomType: normalizeRoomType(room.roomType),
       capacity: room.capacity?.toString() || '2',
       currentOccupancy: room.occupiedCount || 0,
       status: room.status || 'AVAILABLE',
+      isAc: isRoomAc(room),
     });
     setShowModal(true);
   };
@@ -221,15 +256,34 @@ export default function RoomsPage() {
     setSaving(true);
 
     try {
+      let updatedAmenities = editingRoom?.amenities || 'Attached Bathroom, Beds, Study Table, Wardrobe';
+      if (formData.isAc) {
+        if (!isRoomAc({ amenities: updatedAmenities })) {
+          updatedAmenities = updatedAmenities ? `AC, ${updatedAmenities}` : 'AC';
+        }
+      } else {
+        updatedAmenities = updatedAmenities
+          .replace(/\b(AC|A\/C|Air Condition(ing|er)?)\b/gi, '')
+          .replace(/,\s*,/g, ',')
+          .replace(/^,\s*/, '')
+          .replace(/,\s*$/, '')
+          .trim();
+      }
+
+      const resolvedStatus = formData.status === 'MAINTENANCE'
+        ? 'MAINTENANCE'
+        : (editingRoom?.status && editingRoom.status !== 'MAINTENANCE' ? editingRoom.status : 'AVAILABLE');
+
       const roomData = {
         roomNumber: formData.roomNumber,
         hostelId: parseInt(formData.hostelId),
-        floor: parseInt(formData.floor),
+        floor: formData.floor !== '' ? parseInt(formData.floor) : 1,
         block: formData.block,
-        roomType: formData.roomType,
+        roomType: toDbRoomType(formData.roomType),
         capacity: parseInt(formData.capacity),
         occupiedCount: editingRoom?.occupiedCount || 0,
-        status: formData.status || 'AVAILABLE',
+        status: resolvedStatus,
+        amenities: updatedAmenities,
       };
 
       const url = editingRoom 
@@ -262,7 +316,11 @@ export default function RoomsPage() {
       const newData = { ...prev, [field]: value };
       // Auto-update capacity based on roomType
       if (field === 'roomType') {
-        newData.capacity = value === '2-Sharing' ? '2' : '3';
+        const val = (value || '').toUpperCase();
+        if (val.includes('INDIVIDUAL') || val.includes('1')) newData.capacity = '1';
+        else if (val.includes('4')) newData.capacity = '4';
+        else if (val.includes('3')) newData.capacity = '3';
+        else newData.capacity = '2';
       }
       return newData;
     });
@@ -452,6 +510,7 @@ export default function RoomsPage() {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Block</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Floor</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Type</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">AC / Non-AC</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Capacity</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Occupied</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
@@ -475,6 +534,17 @@ export default function RoomsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <span className="text-sm text-gray-700">{room.roomType}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {isRoomAc(room) ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-cyan-50 text-cyan-700 border border-cyan-200">
+                          <span className="text-[11px]"></span> AC
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-50 text-gray-600 border border-gray-200">
+                          <span className="text-[11px]"></span> Non-AC
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span className="text-sm font-medium text-gray-900">{room.capacity}</span>
@@ -595,22 +665,38 @@ export default function RoomsPage() {
                     value={formData.floor}
                     onChange={(e) => handleChange('floor', e.target.value)}
                     placeholder="1"
-                    min="1"
+                    min="0"
                     className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Room Type *</label>
-                <select
-                  value={formData.roomType}
-                  onChange={(e) => handleChange('roomType', e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                >
-                  <option value="2-Sharing">2-Sharing</option>
-                  <option value="3-Sharing">3-Sharing</option>
-                </select>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Room Type *</label>
+                  <select
+                    value={formData.roomType}
+                    onChange={(e) => handleChange('roomType', e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  >
+                    <option value="Individual">Individual (1-Sharing)</option>
+                    <option value="2-Sharing">2-Sharing</option>
+                    <option value="3-Sharing">3-Sharing</option>
+                    <option value="4-Sharing">4-Sharing</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">AC / Non-AC *</label>
+                  <select
+                    value={formData.isAc ? 'AC' : 'NON_AC'}
+                    onChange={(e) => handleChange('isAc', e.target.value === 'AC')}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  >
+                    <option value="NON_AC"> Non-AC Room</option>
+                    <option value="AC"> AC Room</option>
+                  </select>
+                </div>
               </div>
 
               <div>

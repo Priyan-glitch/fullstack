@@ -7,6 +7,11 @@ public class StudentPreferenceDTO {
     private Long studentId;
     private String roomType;
     private String acPreference; // "AC", "NON_AC", "BOTH"
+    // Ranked room-type preferences for Strategy 2 (PreferenceQueueLouvain)
+    private String roomTypePreference1;
+    private String roomTypePreference2;
+    private String roomTypePreference3;
+    private String submittedAt;           // ISO-8601 timestamp — set only when submitted=true
     private String preferredRoommateIds; // comma-separated student IDs
     private String sleepTime;
     private String wakeUpTime;
@@ -39,6 +44,18 @@ public class StudentPreferenceDTO {
 
     public String getAcPreference() { return acPreference; }
     public void setAcPreference(String acPreference) { this.acPreference = acPreference; }
+
+    public String getRoomTypePreference1() { return roomTypePreference1; }
+    public void setRoomTypePreference1(String v) { this.roomTypePreference1 = v; }
+
+    public String getRoomTypePreference2() { return roomTypePreference2; }
+    public void setRoomTypePreference2(String v) { this.roomTypePreference2 = v; }
+
+    public String getRoomTypePreference3() { return roomTypePreference3; }
+    public void setRoomTypePreference3(String v) { this.roomTypePreference3 = v; }
+
+    public String getSubmittedAt() { return submittedAt; }
+    public void setSubmittedAt(String submittedAt) { this.submittedAt = submittedAt; }
 
     public String getPreferredRoommateIds() { return preferredRoommateIds; }
     public void setPreferredRoommateIds(String preferredRoommateIds) { this.preferredRoommateIds = preferredRoommateIds; }

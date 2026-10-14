@@ -14,12 +14,23 @@ public class StudentPreference {
     @Column(nullable = false, unique = true)
     private Long studentId;
     
-    // Room preferences
+    // Room preferences (legacy — primary for Strategy 1)
     @Column(nullable = false)
     private String roomType; // "2_SHARING" or "3_SHARING"
 
     @Column(length = 20)
     private String acPreference; // "AC", "NON_AC", "BOTH"
+
+    // Ranked room-type preferences (Strategy 2 — PreferenceQueueLouvain)
+    // Each stores one of: "INDIVIDUAL", "2_SHARING", "3_SHARING", "4_SHARING"
+    @Column(length = 20)
+    private String roomTypePreference1; // 1st choice
+
+    @Column(length = 20)
+    private String roomTypePreference2; // 2nd choice
+
+    @Column(length = 20)
+    private String roomTypePreference3; // 3rd choice
 
     // Preferred roommate IDs (comma-separated, e.g. "3,7")
     @Column(columnDefinition = "TEXT")
@@ -72,6 +83,15 @@ public class StudentPreference {
     public String getAcPreference() { return acPreference; }
     public void setAcPreference(String acPreference) { this.acPreference = acPreference; }
 
+    public String getRoomTypePreference1() { return roomTypePreference1; }
+    public void setRoomTypePreference1(String roomTypePreference1) { this.roomTypePreference1 = roomTypePreference1; }
+
+    public String getRoomTypePreference2() { return roomTypePreference2; }
+    public void setRoomTypePreference2(String roomTypePreference2) { this.roomTypePreference2 = roomTypePreference2; }
+
+    public String getRoomTypePreference3() { return roomTypePreference3; }
+    public void setRoomTypePreference3(String roomTypePreference3) { this.roomTypePreference3 = roomTypePreference3; }
+
     public String getSleepTime() { return sleepTime; }
     public void setSleepTime(String sleepTime) { this.sleepTime = sleepTime; }
 
@@ -116,4 +136,17 @@ public class StudentPreference {
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    /**
+     * Returns the submission timestamp as ISO-8601 string for the algorithm-engine.
+     * Uses updatedAt when submitted (the last update before locking), falls back to createdAt.
+     */
+    @Transient
+    public String getSubmittedAt() {
+        if (Boolean.TRUE.equals(this.submitted)) {
+            LocalDateTime ts = (this.updatedAt != null) ? this.updatedAt : this.createdAt;
+            return ts != null ? ts.toString() : null;
+        }
+        return null;
+    }
 }

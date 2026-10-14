@@ -56,9 +56,12 @@ public class Room {
     }
 
     private void updateStatus() {
-        if (occupiedCount >= capacity) {
+        if ("MAINTENANCE".equalsIgnoreCase(status)) {
+            return;
+        }
+        if (occupiedCount != null && capacity != null && occupiedCount >= capacity) {
             status = "FULL";
-        } else if (occupiedCount > 0) {
+        } else if (occupiedCount != null && occupiedCount > 0) {
             status = "OCCUPIED";
         } else {
             status = "AVAILABLE";

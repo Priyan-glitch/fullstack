@@ -345,11 +345,6 @@ export default function AdminDashboard() {
                 icon={CheckCircleIcon}
                 onClick={() => navigate('/admin/allocation')}
               />
-              <ActionButton
-                label="Requests"
-                icon={DocumentIcon}
-                onClick={() => navigate('/admin/requests')}
-              />
             </div>
           </div>
         </div>

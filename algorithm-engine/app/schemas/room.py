@@ -29,8 +29,17 @@ class RoomData(BaseModel):
 
     @property
     def sharing_count(self) -> int:
-        """Returns 2 or 3 based on roomType string."""
-        if self.roomType and "3" in self.roomType:
+        """Returns capacity or sharing count based on capacity or roomType string."""
+        if self.capacity:
+            return self.capacity
+        if not self.roomType:
+            return 2
+        rt = self.roomType.upper()
+        if "1" in rt or "INDIVIDUAL" in rt or "SINGLE" in rt:
+            return 1
+        if "4" in rt:
+            return 4
+        if "3" in rt:
             return 3
         return 2
 

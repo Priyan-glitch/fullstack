@@ -127,7 +127,7 @@ def run_allocation(
         run_id=run.id,
         run_by=run.run_by,
         total_students=run.total_students,
-        allocated_count=run.allocated_students,
+        allocated_count=run.allocated_count,
         year=year,
         strategy=strategy_name,
     )
@@ -168,7 +168,7 @@ def approve_run(run_id: str, db: Session) -> AllocationRun:
             run_id=run.id,
             run_by=run.run_by,
             total_students=run.total_students,
-            allocated_count=run.allocated_students,
+            allocated_count=run.allocated_count,
             student_ids=allocated_student_ids,
         )
     except Exception as e:
@@ -192,7 +192,7 @@ def reject_run(run_id: str, db: Session) -> AllocationRun:
             run_id=run.id,
             run_by=run.run_by,
             total_students=run.total_students,
-            allocated_count=run.allocated_students,
+            allocated_count=run.allocated_count,
         )
     except Exception as e:
         logger.warning("Failed to emit ALLOCATION_REJECTED notification: %s", e)

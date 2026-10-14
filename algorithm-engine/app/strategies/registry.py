@@ -8,15 +8,17 @@ To add a new algorithm:
 """
 from app.strategies.base import AlgorithmStrategy
 from app.strategies.graph_clustering import GraphClusteringStrategy
+from app.strategies.preference_queue_louvain import PreferenceQueueLouvainStrategy
 from typing import Dict, Type
 
 STRATEGY_REGISTRY: Dict[str, Type[AlgorithmStrategy]] = {
     "graph_clustering": GraphClusteringStrategy,
+    "preference_queue_louvain": PreferenceQueueLouvainStrategy,
     # "rule_based":       RuleBasedStrategy,       # future
     # "stable_matching":  StableMatchingStrategy,  # future
 }
 
-DEFAULT_STRATEGY = "graph_clustering"
+DEFAULT_STRATEGY = "preference_queue_louvain"
 
 
 def get_strategy(name: str) -> AlgorithmStrategy:

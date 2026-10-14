@@ -15,8 +15,17 @@ class StudentPreferenceData(BaseModel):
     studentId: int
 
     # Room preferences
-    roomType: Optional[str] = None          # "2_SHARING" | "3_SHARING"
-    acPreference: Optional[str] = None      # "AC" | "NON_AC" | "BOTH"
+    roomType: Optional[str] = None              # "2_SHARING" | "3_SHARING" (legacy / fallback)
+    acPreference: Optional[str] = None          # "AC" | "NON_AC" | "BOTH"
+
+    # Ranked room-type preferences (Strategy 2 — PreferenceQueueLouvain)
+    # Each field holds one of: "INDIVIDUAL", "2_SHARING", "3_SHARING", "4_SHARING"
+    roomTypePreference1: Optional[str] = None   # 1st choice
+    roomTypePreference2: Optional[str] = None   # 2nd choice
+    roomTypePreference3: Optional[str] = None   # 3rd choice
+
+    # ISO-8601 timestamp when the preference was submitted — used for FIFO queue ordering
+    submittedAt: Optional[str] = None
 
     # Explicit roommate preferences (comma-separated IDs)
     preferredRoommateIds: Optional[str] = None

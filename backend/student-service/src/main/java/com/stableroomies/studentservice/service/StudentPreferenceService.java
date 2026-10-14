@@ -88,8 +88,18 @@ public class StudentPreferenceService {
         validatePreferredRoommatesGender(studentId, dto.getPreferredRoommateIds());
 
         // Update fields
-        preference.setRoomType(dto.getRoomType());
+        String primaryRoomType = dto.getRoomType();
+        if (primaryRoomType == null || primaryRoomType.isBlank()) {
+            primaryRoomType = dto.getRoomTypePreference1();
+        }
+        if (primaryRoomType == null || primaryRoomType.isBlank()) {
+            primaryRoomType = "2_SHARING";
+        }
+        preference.setRoomType(primaryRoomType);
         preference.setAcPreference(dto.getAcPreference());
+        preference.setRoomTypePreference1(dto.getRoomTypePreference1());
+        preference.setRoomTypePreference2(dto.getRoomTypePreference2());
+        preference.setRoomTypePreference3(dto.getRoomTypePreference3());
         preference.setSleepTime(dto.getSleepTime());
         preference.setWakeUpTime(dto.getWakeUpTime());
         preference.setStudyTiming(dto.getStudyTiming());
@@ -150,6 +160,10 @@ public class StudentPreferenceService {
         dto.setStudentId(entity.getStudentId());
         dto.setRoomType(entity.getRoomType());
         dto.setAcPreference(entity.getAcPreference());
+        dto.setRoomTypePreference1(entity.getRoomTypePreference1());
+        dto.setRoomTypePreference2(entity.getRoomTypePreference2());
+        dto.setRoomTypePreference3(entity.getRoomTypePreference3());
+        dto.setSubmittedAt(entity.getSubmittedAt());
         dto.setSleepTime(entity.getSleepTime());
         dto.setWakeUpTime(entity.getWakeUpTime());
         dto.setStudyTiming(entity.getStudyTiming());
@@ -171,8 +185,18 @@ public class StudentPreferenceService {
     private StudentPreference convertToEntity(StudentPreferenceDTO dto) {
         StudentPreference entity = new StudentPreference();
         entity.setStudentId(dto.getStudentId());
-        entity.setRoomType(dto.getRoomType());
+        String primaryRoomType = dto.getRoomType();
+        if (primaryRoomType == null || primaryRoomType.isBlank()) {
+            primaryRoomType = dto.getRoomTypePreference1();
+        }
+        if (primaryRoomType == null || primaryRoomType.isBlank()) {
+            primaryRoomType = "2_SHARING";
+        }
+        entity.setRoomType(primaryRoomType);
         entity.setAcPreference(dto.getAcPreference());
+        entity.setRoomTypePreference1(dto.getRoomTypePreference1());
+        entity.setRoomTypePreference2(dto.getRoomTypePreference2());
+        entity.setRoomTypePreference3(dto.getRoomTypePreference3());
         entity.setSleepTime(dto.getSleepTime());
         entity.setWakeUpTime(dto.getWakeUpTime());
         entity.setStudyTiming(dto.getStudyTiming());

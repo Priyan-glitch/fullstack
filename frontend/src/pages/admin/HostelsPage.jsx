@@ -46,9 +46,324 @@ const HomeIcon = ({ className }) => (
   </svg>
 );
 
+const EyeIcon = ({ className }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+  </svg>
+);
+
+const computeRoomStats = (roomsList) => {
+  let individual = 0;
+  let twoSharing = 0;
+  let threeSharing = 0;
+  let fourSharing = 0;
+  let ac = 0;
+  let nonAc = 0;
+
+  (roomsList || []).forEach(r => {
+    const rt = (r.roomType || '').toUpperCase().replace('-', '_');
+    const cap = r.capacity;
+    if (rt.includes('1') || rt.includes('INDIVIDUAL') || rt.includes('SINGLE') || cap === 1) {
+      individual++;
+    } else if (rt.includes('2') || cap === 2) {
+      twoSharing++;
+    } else if (rt.includes('3') || cap === 3) {
+      threeSharing++;
+    } else if (rt.includes('4') || cap === 4) {
+      fourSharing++;
+    }
+
+    const isAc = /\b(AC|A\/C|AIR[\s-]CONDITION(ING|ER)?)\b/i.test(r.amenities || '');
+    if (isAc) {
+      ac++;
+    } else {
+      nonAc++;
+    }
+  });
+
+  return {
+    total: roomsList.length,
+    individual,
+    twoSharing,
+    threeSharing,
+    fourSharing,
+    ac,
+    nonAc,
+  };
+};
+
+function RoomBreakdownSection({ stats, loading }) {
+  if (loading) {
+    return (
+      <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 flex items-center justify-center gap-2 text-sm text-gray-500">
+        <svg className="animate-spin w-4 h-4 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4z"/>
+        </svg>
+        Loading room breakdown...
+      </div>
+    );
+  }
+
+  if (!stats) return null;
+
+  return (
+    <div className="bg-gray-50/80 border border-gray-200/90 rounded-xl p-4 space-y-3">
+      <div className="flex items-center justify-between border-b border-gray-200 pb-2.5">
+        <h4 className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
+          <span></span> Room Inventory Breakdown
+        </h4>
+        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-white text-gray-700 border border-gray-200">
+          {stats.total} Total Registered {stats.total === 1 ? 'Room' : 'Rooms'}
+        </span>
+      </div>
+
+      {/* Sharing Types Grid */}
+      <div>
+        <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Sharing Capacity</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <div className="bg-white rounded-lg p-2.5 border border-gray-200 text-center shadow-xs">
+            <span className="text-[11px] text-gray-800 font-semibold block">Individual</span>
+            <span className="text-lg font-bold text-gray-900 mt-0.5 block">{stats.individual}</span>
+            <span className="text-[10px] text-gray-400">1-bed rooms</span>
+          </div>
+          <div className="bg-white rounded-lg p-2.5 border border-gray-200 text-center shadow-xs">
+            <span className="text-[11px] text-gray-800 font-semibold block">2-Sharing</span>
+            <span className="text-lg font-bold text-gray-900 mt-0.5 block">{stats.twoSharing}</span>
+            <span className="text-[10px] text-gray-400">2-bed rooms</span>
+          </div>
+          <div className="bg-white rounded-lg p-2.5 border border-gray-200 text-center shadow-xs">
+            <span className="text-[11px] text-gray-800 font-semibold block">3-Sharing</span>
+            <span className="text-lg font-bold text-gray-900 mt-0.5 block">{stats.threeSharing}</span>
+            <span className="text-[10px] text-gray-400">3-bed rooms</span>
+          </div>
+          <div className="bg-white rounded-lg p-2.5 border border-gray-200 text-center shadow-xs">
+            <span className="text-[11px] text-gray-800 font-semibold block">4-Sharing</span>
+            <span className="text-lg font-bold text-gray-900 mt-0.5 block">{stats.fourSharing}</span>
+            <span className="text-[10px] text-gray-400">4-bed rooms</span>
+          </div>
+        </div>
+      </div>
+
+      {/* AC / Non-AC Grid */}
+      <div>
+        <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Cooling Facility</p>
+        <div className="grid grid-cols-2 gap-2.5">
+          <div className="bg-white rounded-lg p-2.5 border border-gray-200 flex items-center justify-between shadow-xs">
+            <div className="flex items-center gap-2">
+              <div>
+                <p className="text-xs font-semibold text-gray-800">AC Rooms</p>
+                <p className="text-[10px] text-gray-400">Air Conditioned</p>
+              </div>
+            </div>
+            <span className="text-lg font-bold text-gray-900">{stats.ac}</span>
+          </div>
+
+          <div className="bg-white rounded-lg p-2.5 border border-gray-200 flex items-center justify-between shadow-xs">
+            <div className="flex items-center gap-2">
+              <div>
+                <p className="text-xs font-semibold text-gray-800">Non-AC Rooms</p>
+                <p className="text-[10px] text-gray-400">Standard ventilation</p>
+              </div>
+            </div>
+            <span className="text-lg font-bold text-gray-900">{stats.nonAc}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EditableRoomInventory({ formData, onChange, onAutoBalanceNonAc }) {
+  const indiv = parseInt(formData.individualRooms, 10) || 0;
+  const two = parseInt(formData.twoSharingRooms, 10) || 0;
+  const three = parseInt(formData.threeSharingRooms, 10) || 0;
+  const four = parseInt(formData.fourSharingRooms, 10) || 0;
+  const ac = parseInt(formData.acRooms, 10) || 0;
+  const nonAc = parseInt(formData.nonAcRooms, 10) || 0;
+
+  const computedRooms = indiv + two + three + four;
+  const computedCapacity = (indiv * 1) + (two * 2) + (three * 3) + (four * 4);
+  const coolingTotal = ac + nonAc;
+  const isCoolingConsistent = coolingTotal === computedRooms;
+
+  const inputCls = "w-full px-2.5 py-1.5 text-base font-bold text-gray-900 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400";
+
+  return (
+    <div className="bg-gray-50/90 border border-gray-200/90 rounded-xl p-4 space-y-4">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 pb-3">
+        <div>
+          <h4 className="text-xs font-bold text-gray-800 uppercase tracking-wider">
+            Room Inventory Breakdown
+          </h4>
+          <p className="text-[11px] text-gray-500 mt-0.5">
+            Set room counts by type. Total rooms and capacity auto-update.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-white text-gray-800 border border-gray-300">
+            {computedRooms} {computedRooms === 1 ? 'Room' : 'Rooms'}
+          </span>
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-white text-gray-800 border border-gray-300">
+            {computedCapacity} {computedCapacity === 1 ? 'Bed' : 'Beds'}
+          </span>
+        </div>
+      </div>
+
+      {/* Sharing Types Grid */}
+      <div>
+        <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">
+          Sharing Capacity (Room Count)
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          {/* Individual */}
+          <div className="bg-white rounded-lg p-3 border border-gray-200 shadow-xs space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-gray-800">Individual</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-medium">1 bed</span>
+            </div>
+            <input
+              type="number"
+              min="0"
+              value={formData.individualRooms === 0 ? '0' : (formData.individualRooms || '')}
+              onChange={(e) => onChange('individualRooms', e.target.value)}
+              className={inputCls}
+              placeholder="0"
+            />
+            <p className="text-[10px] text-gray-400">= {indiv} bed capacity</p>
+          </div>
+
+          {/* 2-Sharing */}
+          <div className="bg-white rounded-lg p-3 border border-gray-200 shadow-xs space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-gray-800">2-Sharing</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-medium">2 beds</span>
+            </div>
+            <input
+              type="number"
+              min="0"
+              value={formData.twoSharingRooms === 0 ? '0' : (formData.twoSharingRooms || '')}
+              onChange={(e) => onChange('twoSharingRooms', e.target.value)}
+              className={inputCls}
+              placeholder="0"
+            />
+            <p className="text-[10px] text-gray-400">= {two * 2} beds capacity</p>
+          </div>
+
+          {/* 3-Sharing */}
+          <div className="bg-white rounded-lg p-3 border border-gray-200 shadow-xs space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-gray-800">3-Sharing</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-medium">3 beds</span>
+            </div>
+            <input
+              type="number"
+              min="0"
+              value={formData.threeSharingRooms === 0 ? '0' : (formData.threeSharingRooms || '')}
+              onChange={(e) => onChange('threeSharingRooms', e.target.value)}
+              className={inputCls}
+              placeholder="0"
+            />
+            <p className="text-[10px] text-gray-400">= {three * 3} beds capacity</p>
+          </div>
+
+          {/* 4-Sharing */}
+          <div className="bg-white rounded-lg p-3 border border-gray-200 shadow-xs space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-gray-800">4-Sharing</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-medium">4 beds</span>
+            </div>
+            <input
+              type="number"
+              min="0"
+              value={formData.fourSharingRooms === 0 ? '0' : (formData.fourSharingRooms || '')}
+              onChange={(e) => onChange('fourSharingRooms', e.target.value)}
+              className={inputCls}
+              placeholder="0"
+            />
+            <p className="text-[10px] text-gray-400">= {four * 4} beds capacity</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Cooling Facility Grid */}
+      <div>
+        <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Cooling Facility Split</p>
+        <div className="grid grid-cols-2 gap-2.5">
+          <div className="bg-white rounded-lg p-3 border border-gray-200 shadow-xs space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-gray-800">AC Rooms</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-medium">Air Conditioned</span>
+            </div>
+            <input
+              type="number"
+              min="0"
+              value={formData.acRooms === 0 ? '0' : (formData.acRooms || '')}
+              onChange={(e) => onChange('acRooms', e.target.value)}
+              className={inputCls}
+              placeholder="0"
+            />
+            <p className="text-[10px] text-gray-400">Rooms with air conditioning</p>
+          </div>
+
+          <div className="bg-white rounded-lg p-3 border border-gray-200 shadow-xs space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-gray-800">Non-AC Rooms</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-medium">Standard</span>
+            </div>
+            <input
+              type="number"
+              min="0"
+              value={formData.nonAcRooms === 0 ? '0' : (formData.nonAcRooms || '')}
+              onChange={(e) => onChange('nonAcRooms', e.target.value)}
+              className={inputCls}
+              placeholder="0"
+            />
+            <p className="text-[10px] text-gray-400">Standard ventilated rooms</p>
+          </div>
+        </div>
+
+        {/* Consistency Status Callout */}
+        <div className="mt-2.5">
+          {isCoolingConsistent ? (
+            <div className="flex items-center gap-1.5 text-xs font-medium text-gray-700 bg-gray-100 border border-gray-200 rounded-lg px-3 py-1.5">
+              <svg className="w-4 h-4 text-gray-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              <span>Consistent: {ac} AC + {nonAc} Non-AC = {computedRooms} Total Rooms</span>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between flex-wrap gap-2 text-xs font-medium text-gray-800 bg-gray-100 border border-gray-300 rounded-lg px-3 py-2">
+              <div className="flex items-center gap-1.5">
+                <svg className="w-4 h-4 text-gray-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <span>Cooling mismatch: AC ({ac}) + Non-AC ({nonAc}) = {coolingTotal}, but total rooms is {computedRooms}.</span>
+              </div>
+              <button
+                type="button"
+                onClick={onAutoBalanceNonAc}
+                className="px-2.5 py-1 text-[11px] font-semibold text-gray-800 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors cursor-pointer"
+              >
+                Auto-balance Non-AC to {Math.max(0, computedRooms - ac)}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 export default function HostelsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingHostel, setEditingHostel] = useState(null);
+  const [viewingHostel, setViewingHostel] = useState(null);
+  const [hostelRoomStats, setHostelRoomStats] = useState(null);
+  const [loadingRoomStats, setLoadingRoomStats] = useState(false);
   const [saving, setSaving] = useState(false);
   const [hostels, setHostels] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -74,7 +389,26 @@ export default function HostelsPage() {
     }
   };
 
-  const [formData, setFormData] = useState({
+  const fetchHostelRoomStats = async (hostelId) => {
+    try {
+      setLoadingRoomStats(true);
+      setHostelRoomStats(null);
+      const res = await fetch(`${HOSTEL_API_BASE_URL}${API_ENDPOINTS.ROOMS_BY_HOSTEL(hostelId)}`);
+      if (res.ok) {
+        const roomsList = await res.json();
+        const stats = computeRoomStats(roomsList);
+        setHostelRoomStats(stats);
+        return stats;
+      }
+    } catch (err) {
+      console.error('Error fetching hostel rooms:', err);
+    } finally {
+      setLoadingRoomStats(false);
+    }
+    return null;
+  };
+
+  const defaultFormData = {
     name: '',
     address: '',
     totalCapacity: '',
@@ -83,24 +417,30 @@ export default function HostelsPage() {
     wardenName: '',
     wardenPhone: '',
     amenities: '',
-  });
+    individualRooms: 0,
+    twoSharingRooms: 0,
+    threeSharingRooms: 0,
+    fourSharingRooms: 0,
+    acRooms: 0,
+    nonAcRooms: 0,
+    autoSync: true,
+  };
+
+  const [formData, setFormData] = useState(defaultFormData);
 
   const handleAdd = () => {
     setEditingHostel(null);
-    setFormData({
-      name: '',
-      address: '',
-      totalCapacity: '',
-      totalRooms: '',
-      genderType: 'MALE',
-      wardenName: '',
-      wardenPhone: '',
-      amenities: '',
-    });
+    setHostelRoomStats(null);
+    setFormData({ ...defaultFormData });
     setShowModal(true);
   };
 
-  const handleEdit = (hostel) => {
+  const handleView = (hostel) => {
+    setViewingHostel(hostel);
+    fetchHostelRoomStats(hostel.id);
+  };
+
+  const handleEdit = async (hostel) => {
     setEditingHostel(hostel);
     setFormData({
       name: hostel.name,
@@ -111,8 +451,105 @@ export default function HostelsPage() {
       wardenName: hostel.wardenName || '',
       wardenPhone: hostel.wardenPhone || '',
       amenities: hostel.amenities || '',
+      individualRooms: 0,
+      twoSharingRooms: 0,
+      threeSharingRooms: 0,
+      fourSharingRooms: 0,
+      acRooms: 0,
+      nonAcRooms: 0,
+      autoSync: true,
     });
     setShowModal(true);
+
+    const stats = await fetchHostelRoomStats(hostel.id);
+    if (stats && stats.total > 0) {
+      const computedRooms = stats.individual + stats.twoSharing + stats.threeSharing + stats.fourSharing;
+      const computedCap = (stats.individual * 1) + (stats.twoSharing * 2) + (stats.threeSharing * 3) + (stats.fourSharing * 4);
+      setFormData(prev => ({
+        ...prev,
+        individualRooms: stats.individual,
+        twoSharingRooms: stats.twoSharing,
+        threeSharingRooms: stats.threeSharing,
+        fourSharingRooms: stats.fourSharing,
+        acRooms: stats.ac,
+        nonAcRooms: stats.nonAc,
+        totalRooms: computedRooms || hostel.totalRooms || 0,
+        totalCapacity: computedCap || hostel.totalCapacity || 0,
+      }));
+    } else if (hostel.totalRooms > 0) {
+      setFormData(prev => ({
+        ...prev,
+        nonAcRooms: prev.nonAcRooms || hostel.totalRooms || 0,
+      }));
+    }
+  };
+
+  const handleInventoryChange = (field, rawValue) => {
+    const num = Math.max(0, parseInt(rawValue, 10) || 0);
+    setFormData(prev => {
+      const next = { ...prev, [field]: num };
+      
+      const indiv = field === 'individualRooms' ? num : (parseInt(next.individualRooms, 10) || 0);
+      const two = field === 'twoSharingRooms' ? num : (parseInt(next.twoSharingRooms, 10) || 0);
+      const three = field === 'threeSharingRooms' ? num : (parseInt(next.threeSharingRooms, 10) || 0);
+      const four = field === 'fourSharingRooms' ? num : (parseInt(next.fourSharingRooms, 10) || 0);
+      
+      const computedRooms = indiv + two + three + four;
+      const computedCap = (indiv * 1) + (two * 2) + (three * 3) + (four * 4);
+
+      if (prev.autoSync !== false) {
+        next.totalRooms = computedRooms;
+        next.totalCapacity = computedCap;
+      }
+
+      // If user changed sharing room types, auto-adapt nonAc so ac + nonAc === computedRooms
+      if (['individualRooms', 'twoSharingRooms', 'threeSharingRooms', 'fourSharingRooms'].includes(field)) {
+        const currentAc = parseInt(next.acRooms, 10) || 0;
+        if (currentAc <= computedRooms) {
+          next.nonAcRooms = computedRooms - currentAc;
+        } else {
+          next.acRooms = computedRooms;
+          next.nonAcRooms = 0;
+        }
+      } else if (field === 'acRooms') {
+        const total = prev.autoSync !== false ? computedRooms : (parseInt(next.totalRooms, 10) || computedRooms);
+        next.nonAcRooms = Math.max(0, total - num);
+      }
+
+      return next;
+    });
+  };
+
+  const handleAutoBalanceNonAc = () => {
+    setFormData(prev => {
+      const indiv = parseInt(prev.individualRooms, 10) || 0;
+      const two = parseInt(prev.twoSharingRooms, 10) || 0;
+      const three = parseInt(prev.threeSharingRooms, 10) || 0;
+      const four = parseInt(prev.fourSharingRooms, 10) || 0;
+      const computedRooms = indiv + two + three + four;
+      const ac = parseInt(prev.acRooms, 10) || 0;
+      return {
+        ...prev,
+        nonAcRooms: Math.max(0, computedRooms - ac),
+      };
+    });
+  };
+
+  const handleSyncTotals = () => {
+    setFormData(prev => {
+      const indiv = parseInt(prev.individualRooms, 10) || 0;
+      const two = parseInt(prev.twoSharingRooms, 10) || 0;
+      const three = parseInt(prev.threeSharingRooms, 10) || 0;
+      const four = parseInt(prev.fourSharingRooms, 10) || 0;
+      const computedRooms = indiv + two + three + four;
+      const computedCap = (indiv * 1) + (two * 2) + (three * 3) + (four * 4);
+      return {
+        ...prev,
+        totalRooms: computedRooms,
+        totalCapacity: computedCap,
+        autoSync: true,
+      };
+    });
   };
 
   const handleDelete = async (id) => {
@@ -135,11 +572,33 @@ export default function HostelsPage() {
     setSaving(true);
 
     try {
+      const indiv = parseInt(formData.individualRooms, 10) || 0;
+      const two = parseInt(formData.twoSharingRooms, 10) || 0;
+      const three = parseInt(formData.threeSharingRooms, 10) || 0;
+      const four = parseInt(formData.fourSharingRooms, 10) || 0;
+      const computedRooms = indiv + two + three + four;
+      const computedCap = (indiv * 1) + (two * 2) + (three * 3) + (four * 4);
+
+      const finalTotalRooms = (formData.autoSync !== false && computedRooms > 0)
+        ? computedRooms
+        : (parseInt(formData.totalRooms, 10) || computedRooms);
+
+      const finalTotalCapacity = (formData.autoSync !== false && computedCap > 0)
+        ? computedCap
+        : (parseInt(formData.totalCapacity, 10) || computedCap);
+
       const hostelData = {
-        ...formData,
-        totalCapacity: parseInt(formData.totalCapacity),
-        totalRooms: parseInt(formData.totalRooms),
-        availableCapacity: editingHostel ? editingHostel.availableCapacity : parseInt(formData.totalCapacity),
+        name: formData.name,
+        address: formData.address,
+        genderType: formData.genderType,
+        wardenName: formData.wardenName,
+        wardenPhone: formData.wardenPhone,
+        amenities: formData.amenities,
+        totalCapacity: finalTotalCapacity,
+        totalRooms: finalTotalRooms,
+        availableCapacity: editingHostel 
+          ? Math.min(editingHostel.availableCapacity, finalTotalCapacity)
+          : finalTotalCapacity,
         active: true,
       };
 
@@ -156,12 +615,34 @@ export default function HostelsPage() {
       });
 
       if (!response.ok) throw new Error('Failed to save hostel');
+      const savedHostel = await response.json();
+      const targetHostelId = editingHostel ? editingHostel.id : savedHostel.id;
+
+      // Sync room inventory in the backend rooms table
+      if (targetHostelId && computedRooms > 0) {
+        try {
+          await fetch(`${HOSTEL_API_BASE_URL}${API_ENDPOINTS.ROOMS_SYNC_INVENTORY(targetHostelId)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              individualRooms: indiv,
+              twoSharingRooms: two,
+              threeSharingRooms: three,
+              fourSharingRooms: four,
+              acRooms: parseInt(formData.acRooms, 10) || 0,
+              nonAcRooms: parseInt(formData.nonAcRooms, 10) || 0,
+            }),
+          });
+        } catch (syncErr) {
+          console.warn('Could not sync room records to database:', syncErr);
+        }
+      }
 
       await fetchHostels();
       setShowModal(false);
     } catch (err) {
       console.error('Error saving hostel:', err);
-      alert('Failed to save hostel');
+      alert('Failed to save hostel: ' + err.message);
     } finally {
       setSaving(false);
     }
@@ -275,6 +756,13 @@ export default function HostelsPage() {
                     </div>
                     <div className="flex items-center gap-1">
                       <button
+                        onClick={() => handleView(hostel)}
+                        className="p-1.5 rounded-lg text-white/80 hover:bg-white/20 transition-colors cursor-pointer"
+                        title="View Hostel Details"
+                      >
+                        <EyeIcon className="w-4 h-4" />
+                      </button>
+                      <button
                         onClick={() => handleEdit(hostel)}
                         className="p-1.5 rounded-lg text-white/80 hover:bg-white/20 transition-colors cursor-pointer"
                         title="Edit Hostel"
@@ -362,6 +850,15 @@ export default function HostelsPage() {
                       )}
                     </div>
                   )}
+
+                  {/* Quick View Button */}
+                  <button
+                    onClick={() => handleView(hostel)}
+                    className="w-full mt-2 py-2 px-3 rounded-lg border border-gray-200 hover:bg-gray-50 text-xs font-semibold text-gray-700 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <EyeIcon className="w-3.5 h-3.5 text-gray-500" />
+                    View Hostel & Room Breakdown
+                  </button>
                 </div>
               </div>
             );
@@ -402,6 +899,13 @@ export default function HostelsPage() {
 
             {/* Modal Body */}
             <div className="p-6 space-y-4">
+              {/* Editable Room Inventory Breakdown */}
+              <EditableRoomInventory
+                formData={formData}
+                onChange={handleInventoryChange}
+                onAutoBalanceNonAc={handleAutoBalanceNonAc}
+              />
+
               {/* Basic Info */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Hostel Name *</label>
@@ -428,26 +932,76 @@ export default function HostelsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Total Capacity *</label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-sm font-medium text-gray-700">Total Capacity *</label>
+                    {formData.autoSync !== false && (
+                      <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded">
+                        Auto-calculated
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="number"
                     value={formData.totalCapacity}
                     onChange={(e) => handleChange('totalCapacity', e.target.value)}
-                    placeholder="300"
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    disabled={formData.autoSync !== false}
+                    placeholder="e.g. 150"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-800 disabled:font-medium"
                   />
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    {formData.autoSync !== false ? 'Calculated from bed counts in Room Inventory' : 'Manual capacity override'}
+                  </p>
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Total Rooms *</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-sm font-medium text-gray-700">Total Rooms *</label>
+                  {formData.autoSync !== false && (
+                    <span className="text-[10px] font-semibold text-green-700 bg-green-50 border border-green-200 px-1.5 py-0.5 rounded">
+                      Auto-calculated
+                    </span>
+                  )}
+                </div>
                 <input
                   type="number"
                   value={formData.totalRooms}
                   onChange={(e) => handleChange('totalRooms', e.target.value)}
-                  placeholder="100"
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  disabled={formData.autoSync !== false}
+                  placeholder="e.g. 60"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-800 disabled:font-medium"
                 />
+                <p className="text-[11px] text-gray-400 mt-1">
+                  {formData.autoSync !== false ? 'Sum of all sharing room counts' : 'Manual rooms override'}
+                </p>
+              </div>
+
+              {/* Consistency & Sync Bar */}
+              <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3.5 py-2.5">
+                <label className="flex items-center gap-2 text-xs font-medium text-gray-700 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={formData.autoSync !== false}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        handleSyncTotals();
+                      } else {
+                        setFormData(prev => ({ ...prev, autoSync: false }));
+                      }
+                    }}
+                    className="rounded text-green-600 focus:ring-green-500 h-4 w-4"
+                  />
+                  <span>Keep Total Rooms & Capacity in sync with Room Inventory</span>
+                </label>
+                {formData.autoSync === false && (
+                  <button
+                    type="button"
+                    onClick={handleSyncTotals}
+                    className="text-xs font-semibold text-green-700 hover:text-green-800 underline cursor-pointer"
+                  >
+                    Sync with Inventory
+                  </button>
+                )}
               </div>
 
               <div>
@@ -508,7 +1062,7 @@ export default function HostelsPage() {
               </button>
               <button
                 onClick={handleSave}
-                disabled={saving || !formData.name || !formData.totalCapacity || !formData.totalRooms}
+                disabled={saving || !formData.name}
                 className="px-4 py-2 text-sm font-semibold text-white rounded-lg transition-all cursor-pointer disabled:opacity-60 flex items-center gap-2"
                 style={{ background: 'linear-gradient(135deg, #2d5016, #4a7c2c)' }}
               >
@@ -523,6 +1077,107 @@ export default function HostelsPage() {
                 ) : (
                   editingHostel ? 'Update Hostel' : 'Add Hostel'
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* View Hostel Modal */}
+      {viewingHostel && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setViewingHostel(null)}>
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-[#2d5016] to-[#4a7c2c] px-6 py-5 text-white flex items-start justify-between rounded-t-2xl">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl font-bold">{viewingHostel.name}</h2>
+                  <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-white/20 text-white backdrop-blur-xs">
+                    {viewingHostel.genderType} Hostel
+                  </span>
+                </div>
+                <p className="text-xs text-white/80 mt-1">{viewingHostel.address || 'No address provided'}</p>
+              </div>
+              <button
+                onClick={() => setViewingHostel(null)}
+                className="p-1.5 rounded-lg text-white/80 hover:bg-white/20 transition-colors cursor-pointer"
+              >
+                <XIcon className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-5">
+              {/* Capacity & Occupancy Summary */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100 text-center">
+                  <p className="text-xs text-gray-500">Total Capacity</p>
+                  <p className="text-xl font-bold text-gray-900 mt-0.5">{viewingHostel.totalCapacity} beds</p>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100 text-center">
+                  <p className="text-xs text-gray-500">Occupied</p>
+                  <p className="text-xl font-bold text-emerald-700 mt-0.5">
+                    {viewingHostel.totalCapacity - viewingHostel.availableCapacity} beds
+                  </p>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100 text-center">
+                  <p className="text-xs text-gray-500">Available</p>
+                  <p className="text-xl font-bold text-blue-700 mt-0.5">{viewingHostel.availableCapacity} beds</p>
+                </div>
+              </div>
+
+              {/* Room Breakdown (Individual, 2/3/4 sharing, AC, Non-AC) */}
+              <RoomBreakdownSection stats={hostelRoomStats} loading={loadingRoomStats} />
+
+              {/* Warden Details */}
+              {(viewingHostel.wardenName || viewingHostel.wardenPhone) && (
+                <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                  <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Warden In Charge</h4>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">{viewingHostel.wardenName || 'Not Assigned'}</p>
+                    {viewingHostel.wardenPhone && (
+                      <p className="text-xs text-gray-500 mt-0.5">{viewingHostel.wardenPhone}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Amenities */}
+              {viewingHostel.amenities && (
+                <div>
+                  <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Hostel Amenities</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {viewingHostel.amenities.split(',').map((amenity, idx) => (
+                      <span
+                        key={idx}
+                        className="px-2.5 py-1 bg-green-50 text-green-800 border border-green-200 rounded-lg text-xs font-medium"
+                      >
+                        {amenity.trim()}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="bg-gray-50 border-t border-gray-100 px-6 py-4 flex items-center justify-between rounded-b-2xl">
+              <button
+                onClick={() => {
+                  const h = viewingHostel;
+                  setViewingHostel(null);
+                  handleEdit(h);
+                }}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+              >
+                <PencilIcon className="w-3.5 h-3.5" />
+                Edit Hostel Info
+              </button>
+              <button
+                onClick={() => setViewingHostel(null)}
+                className="px-5 py-2 text-xs font-semibold text-white rounded-lg transition-all cursor-pointer"
+                style={{ background: 'linear-gradient(135deg, #2d5016, #4a7c2c)' }}
+              >
+                Close
               </button>
             </div>
           </div>

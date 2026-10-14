@@ -38,9 +38,39 @@ public class StudentService {
     }
 
     public StudentDTO getStudentByEmail(String email) {
-        Student student = studentRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Student not found with email: " + email));
-        return convertToDTO(student);
+        Optional<Student> studentOpt = studentRepository.findByEmail(email);
+        if (studentOpt.isPresent()) {
+            return convertToDTO(studentOpt.get());
+        }
+
+        // Auto-provision student profile for newly signed-in Clerk user
+        Student newStudent = new Student();
+        newStudent.setEmail(email);
+        String prefix = (email != null && email.contains("@"))
+                ? email.substring(0, email.indexOf("@")).replaceAll("[^a-zA-Z]", " ")
+                : "Student";
+        prefix = prefix.trim();
+        String firstName = prefix.isEmpty() ? "Student" : Character.toUpperCase(prefix.charAt(0)) + (prefix.length() > 1 ? prefix.substring(1) : "");
+        newStudent.setFirstName(firstName);
+        newStudent.setLastName("User");
+
+        // Generate unique register number e.g. 2024REGxxxx
+        String regNum = "2024REG" + String.format("%04d", (int)(Math.random() * 9000 + 1000));
+        while (studentRepository.existsByRegisterNumber(regNum)) {
+            regNum = "2024REG" + String.format("%04d", (int)(Math.random() * 9000 + 1000));
+        }
+        newStudent.setRegisterNumber(regNum);
+        newStudent.setPassword("clerk_authenticated");
+        newStudent.setDepartment(Department.COMPUTER_SCIENCE);
+        newStudent.setYear(1);
+        newStudent.setSemester(1);
+        newStudent.setGender("Male");
+        newStudent.setActive(true);
+        newStudent.setProfileComplete(false);
+        newStudent.setProfileCompletionPercent(40);
+
+        Student saved = studentRepository.save(newStudent);
+        return convertToDTO(saved);
     }
 
     public StudentDTO getStudentByRegisterNumber(String registerNumber) {

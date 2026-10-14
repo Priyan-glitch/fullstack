@@ -1,5 +1,6 @@
 package com.stableroomies.hostelservice.controller;
 
+import com.stableroomies.hostelservice.dto.RoomInventoryDTO;
 import com.stableroomies.hostelservice.model.Room;
 import com.stableroomies.hostelservice.service.RoomService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,5 +47,12 @@ public class RoomController {
     public ResponseEntity<Void> deleteRoom(@PathVariable Long id) {
         roomService.deleteRoom(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/hostel/{hostelId}/sync-inventory")
+    public ResponseEntity<List<Room>> syncHostelInventory(
+            @PathVariable Long hostelId,
+            @RequestBody RoomInventoryDTO inventory) {
+        return ResponseEntity.ok(roomService.syncHostelRoomInventory(hostelId, inventory));
     }
 }
