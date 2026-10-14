@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { UserButton } from '@clerk/react';
 import { useUser } from '../contexts/UserContext';
 import BrandMark from '../components/common/BrandMark';
+import NotificationBell from '../components/NotificationBell';
 
 const navItems = [
   {
@@ -86,17 +87,8 @@ export default function StudentLayout({ children }) {
         {/* Right side */}
         <div className="flex items-center gap-2">
 
-          {/* Notification bell */}
-          <button
-            type="button"
-            className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition cursor-pointer"
-            aria-label="Notifications"
-            title="Notifications"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
-            </svg>
-          </button>
+          {/* Real-time Notification Bell */}
+          <NotificationBell />
 
           {/* Signed-in identity + Clerk account menu */}
           <div className="flex items-center gap-2.5 pl-3 border-l border-gray-100">

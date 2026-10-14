@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { UserButton } from '@clerk/react';
 import { useUser } from '../contexts/UserContext';
 import BrandMark from '../components/common/BrandMark';
+import NotificationBell from '../components/NotificationBell';
 
 const navItems = [
   {
@@ -92,15 +93,20 @@ export default function AdminLayout({ children }) {
         {/* Spacer */}
         <div className="flex-1" />
 
-        {/* Right side — signed-in identity + Clerk account menu */}
-        <div className="flex items-center gap-2.5 pl-3 border-l border-gray-100">
-          <div className="hidden sm:flex flex-col items-end leading-tight">
-            <span className="text-sm font-medium text-gray-700 max-w-[12rem] truncate">
-              {displayName}
-            </span>
-            <span className="text-[11px] text-gray-400">Warden</span>
+        {/* Right side — notifications + signed-in identity + Clerk account menu */}
+        <div className="flex items-center gap-2">
+          {/* Real-time Notification Bell */}
+          <NotificationBell />
+
+          <div className="flex items-center gap-2.5 pl-3 border-l border-gray-100">
+            <div className="hidden sm:flex flex-col items-end leading-tight">
+              <span className="text-sm font-medium text-gray-700 max-w-[12rem] truncate">
+                {displayName}
+              </span>
+              <span className="text-[11px] text-gray-400">Warden</span>
+            </div>
+            <UserButton />
           </div>
-          <UserButton />
         </div>
       </header>
 

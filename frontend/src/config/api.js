@@ -2,6 +2,7 @@
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081';
 export const HOSTEL_API_BASE_URL = import.meta.env.VITE_HOSTEL_API_BASE_URL || 'http://localhost:8082';
 export const ALLOCATION_SERVICE_URL = import.meta.env.VITE_ALLOCATION_SERVICE_URL || 'http://localhost:8083';
+export const NOTIFICATION_API_BASE_URL = import.meta.env.VITE_NOTIFICATION_API_BASE_URL || 'http://localhost:8084';
 export const ALGORITHM_API_BASE_URL = import.meta.env.VITE_ALGORITHM_API_BASE_URL || 'http://localhost:8090';
 // Alias kept for backward-compat with files that still import the old name
 export const ALLOCATION_API_BASE_URL = API_BASE_URL;
@@ -51,6 +52,48 @@ export const API_ENDPOINTS = {
   ROOMS: '/api/rooms',
   ROOM_BY_ID: (id) => `/api/rooms/${id}`,
   ROOMS_BY_HOSTEL: (hostelId) => `/api/rooms/hostel/${hostelId}`,
+
+  // Notifications (port 8084)
+  NOTIFICATIONS_FOR_USER: (userId) => `/api/notifications/${userId}`,
+  NOTIFICATIONS_UNREAD: (userId) => `/api/notifications/${userId}/unread-count`,
+  NOTIFICATIONS_MARK_READ: (id, userId) => `/api/notifications/${id}/read?userId=${userId}`,
+  NOTIFICATIONS_MARK_ALL_READ: (userId) => `/api/notifications/${userId}/mark-all-read`,
+  NOTIFICATIONS_DELETE: (id) => `/api/notifications/${id}`,
+};
+
+// Notification Service API helpers
+export const notificationApi = {
+  getNotifications: async (userId) => {
+    const res = await fetch(`${NOTIFICATION_API_BASE_URL}${API_ENDPOINTS.NOTIFICATIONS_FOR_USER(userId)}`);
+    if (!res.ok) throw new Error('Failed to fetch notifications');
+    return res.json();
+  },
+  getUnreadCount: async (userId) => {
+    const res = await fetch(`${NOTIFICATION_API_BASE_URL}${API_ENDPOINTS.NOTIFICATIONS_UNREAD(userId)}`);
+    if (!res.ok) throw new Error('Failed to fetch unread count');
+    return res.json();
+  },
+  markRead: async (id, userId) => {
+    const res = await fetch(`${NOTIFICATION_API_BASE_URL}${API_ENDPOINTS.NOTIFICATIONS_MARK_READ(id, userId)}`, {
+      method: 'PATCH',
+    });
+    if (!res.ok) throw new Error('Failed to mark notification as read');
+    return res.json();
+  },
+  markAllRead: async (userId) => {
+    const res = await fetch(`${NOTIFICATION_API_BASE_URL}${API_ENDPOINTS.NOTIFICATIONS_MARK_ALL_READ(userId)}`, {
+      method: 'POST',
+    });
+    if (!res.ok) throw new Error('Failed to mark all notifications as read');
+    return res.json();
+  },
+  delete: async (id) => {
+    const res = await fetch(`${NOTIFICATION_API_BASE_URL}${API_ENDPOINTS.NOTIFICATIONS_DELETE(id)}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('Failed to delete notification');
+    return res.json();
+  },
 };
 
 // Helper function to make API calls

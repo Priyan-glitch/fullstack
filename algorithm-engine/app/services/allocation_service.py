@@ -26,6 +26,7 @@ from app.strategies.registry import get_strategy
 from app.strategies.base import AllocationResult, RoommateGroup
 from app.models.allocation_run import AllocationRun
 from app.models.allocation_group import AllocationGroup
+from app.services.notification_publisher import publish_notification_event
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +120,18 @@ def run_allocation(
     db.commit()
     db.refresh(run)
     logger.info("=== Allocation run %s saved (status=DRAFT). ===", run.id)
+
+    # Publish notification event to RabbitMQ
+    publish_notification_event(
+        event_type="ALLOCATION_CREATED",
+        run_id=run.id,
+        run_by=run.run_by,
+        total_students=run.total_students,
+        allocated_count=run.allocated_students,
+        year=year,
+        strategy=strategy_name,
+    )
+
     return run
 
 
@@ -134,6 +147,33 @@ def approve_run(run_id: str, db: Session) -> AllocationRun:
         _sync_approved_allocation(run_id, db)
     except Exception as e:
         logger.exception("Failed to sync approved allocation to downstream services: %s", e)
+
+    # Collect allocated student IDs and broadcast notification
+    try:
+        groups = (
+            db.query(AllocationGroup)
+            .filter(AllocationGroup.run_id == run_id, AllocationGroup.room_id.isnot(None))
+            .all()
+        )
+        allocated_student_ids: list[str] = []
+        for g in groups:
+            if g.student_ids:
+                for s in g.student_ids.split(","):
+                    clean = s.strip()
+                    if clean:
+                        allocated_student_ids.append(clean)
+
+        publish_notification_event(
+            event_type="ALLOCATION_APPROVED",
+            run_id=run.id,
+            run_by=run.run_by,
+            total_students=run.total_students,
+            allocated_count=run.allocated_students,
+            student_ids=allocated_student_ids,
+        )
+    except Exception as e:
+        logger.warning("Failed to emit ALLOCATION_APPROVED notification: %s", e)
+
     return run
 
 
@@ -144,6 +184,19 @@ def reject_run(run_id: str, db: Session) -> AllocationRun:
     run.status = "REJECTED"
     db.commit()
     db.refresh(run)
+
+    # Publish rejection event
+    try:
+        publish_notification_event(
+            event_type="ALLOCATION_REJECTED",
+            run_id=run.id,
+            run_by=run.run_by,
+            total_students=run.total_students,
+            allocated_count=run.allocated_students,
+        )
+    except Exception as e:
+        logger.warning("Failed to emit ALLOCATION_REJECTED notification: %s", e)
+
     return run
 
 

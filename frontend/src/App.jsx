@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import { ClerkProvider } from '@clerk/react';
 
 import { UserProvider } from './contexts/UserContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 import {
   CLERK_PUBLISHABLE_KEY,
   clerkUi,
@@ -74,149 +75,151 @@ function AppRoutes() {
       localization={clerkLocalization}
     >
       <UserProvider>
-        <Routes>
-          {/* Entry point — routes each visitor by session + role */}
-          <Route path="/" element={<RoleRedirect />} />
+        <NotificationProvider>
+          <Routes>
+            {/* Entry point — routes each visitor by session + role */}
+            <Route path="/" element={<RoleRedirect />} />
 
-          {/* Authentication */}
-          <Route
-            path="/login/*"
-            element={
-              <GuestOnly>
-                <LoginPage />
-              </GuestOnly>
-            }
-          />
-          <Route
-            path="/signup/*"
-            element={
-              <GuestOnly>
-                <SignupPage />
-              </GuestOnly>
-            }
-          />
+            {/* Authentication */}
+            <Route
+              path="/login/*"
+              element={
+                <GuestOnly>
+                  <LoginPage />
+                </GuestOnly>
+              }
+            />
+            <Route
+              path="/signup/*"
+              element={
+                <GuestOnly>
+                  <SignupPage />
+                </GuestOnly>
+              }
+            />
 
-          {/* Student */}
-          <Route
-            path="/student/dashboard"
-            element={
-              <ProtectedRoute allow={['student']}>
-                <StudentDashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/student/profile"
-            element={
-              <ProtectedRoute allow={['student']}>
-                <ProfilePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/student/preferences"
-            element={
-              <ProtectedRoute allow={['student']}>
-                <PreferencesPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/student/allocation"
-            element={
-              <ProtectedRoute allow={['student']}>
-                <AllocationPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/student/requests"
-            element={
-              <ProtectedRoute allow={['student']}>
-                <StudentLayout>
-                  <PlaceholderPage
-                    title="Room change requests"
-                    description="Raise a request to swap rooms or roommates and track the warden's decision. The allocation service already exposes the endpoints this screen will use."
-                  />
-                </StudentLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/student/*"
-            element={
-              <ProtectedRoute allow={['student']}>
-                <NotFoundPage />
-              </ProtectedRoute>
-            }
-          />
+            {/* Student */}
+            <Route
+              path="/student/dashboard"
+              element={
+                <ProtectedRoute allow={['student']}>
+                  <StudentDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/student/profile"
+              element={
+                <ProtectedRoute allow={['student']}>
+                  <ProfilePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/student/preferences"
+              element={
+                <ProtectedRoute allow={['student']}>
+                  <PreferencesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/student/allocation"
+              element={
+                <ProtectedRoute allow={['student']}>
+                  <AllocationPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/student/requests"
+              element={
+                <ProtectedRoute allow={['student']}>
+                  <StudentLayout>
+                    <PlaceholderPage
+                      title="Room change requests"
+                      description="Raise a request to swap rooms or roommates and track the warden's decision. The allocation service already exposes the endpoints this screen will use."
+                    />
+                  </StudentLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/student/*"
+              element={
+                <ProtectedRoute allow={['student']}>
+                  <NotFoundPage />
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Admin / warden */}
-          <Route
-            path="/admin/dashboard"
-            element={
-              <ProtectedRoute allow={['admin']}>
-                <AdminDashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/students"
-            element={
-              <ProtectedRoute allow={['admin']}>
-                <StudentsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/hostels"
-            element={
-              <ProtectedRoute allow={['admin']}>
-                <HostelsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/rooms"
-            element={
-              <ProtectedRoute allow={['admin']}>
-                <RoomsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/allocation"
-            element={
-              <ProtectedRoute allow={['admin']}>
-                <AdminAllocationPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/requests"
-            element={
-              <ProtectedRoute allow={['admin']}>
-                <AdminLayout>
-                  <PlaceholderPage
-                    title="Request queue"
-                    description="Review room change requests raised by students, approve or reject them, and keep an audit trail of every decision."
-                  />
-                </AdminLayout>
-              </ProtectedRoute>
-            }
-          />
+            {/* Admin / warden */}
+            <Route
+              path="/admin/dashboard"
+              element={
+                <ProtectedRoute allow={['admin']}>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/students"
+              element={
+                <ProtectedRoute allow={['admin']}>
+                  <StudentsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/hostels"
+              element={
+                <ProtectedRoute allow={['admin']}>
+                  <HostelsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/rooms"
+              element={
+                <ProtectedRoute allow={['admin']}>
+                  <RoomsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/allocation"
+              element={
+                <ProtectedRoute allow={['admin']}>
+                  <AdminAllocationPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/requests"
+              element={
+                <ProtectedRoute allow={['admin']}>
+                  <AdminLayout>
+                    <PlaceholderPage
+                      title="Request queue"
+                      description="Review room change requests raised by students, approve or reject them, and keep an audit trail of every decision."
+                    />
+                  </AdminLayout>
+                </ProtectedRoute>
+              }
+            />
 
-          <Route
-            path="/admin/*"
-            element={
-              <ProtectedRoute allow={['admin']}>
-                <NotFoundPage />
-              </ProtectedRoute>
-            }
-          />
+            <Route
+              path="/admin/*"
+              element={
+                <ProtectedRoute allow={['admin']}>
+                  <NotFoundPage />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route path="*" element={<NotFoundPage />} />
-        </Routes>
+            <Route path="*" element={<NotFoundPage />} />
+          </Routes>
+        </NotificationProvider>
       </UserProvider>
     </ClerkProvider>
   );
