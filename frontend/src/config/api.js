@@ -1,6 +1,7 @@
 // API Configuration
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081';
 export const HOSTEL_API_BASE_URL = import.meta.env.VITE_HOSTEL_API_BASE_URL || 'http://localhost:8082';
+export const ALLOCATION_SERVICE_URL = import.meta.env.VITE_ALLOCATION_SERVICE_URL || 'http://localhost:8083';
 export const ALGORITHM_API_BASE_URL = import.meta.env.VITE_ALGORITHM_API_BASE_URL || 'http://localhost:8090';
 // Alias kept for backward-compat with files that still import the old name
 export const ALLOCATION_API_BASE_URL = API_BASE_URL;

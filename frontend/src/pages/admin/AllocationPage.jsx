@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import AdminLayout from '../../layouts/AdminLayout';
-import { API_BASE_URL, ALGORITHM_API_BASE_URL, API_ENDPOINTS } from '../../config/api';
+import { API_BASE_URL, ALGORITHM_API_BASE_URL, ALLOCATION_SERVICE_URL, API_ENDPOINTS } from '../../config/api';
 
 // ── Icons ──────────────────────────────────────────────────────────────────────
 const CogIcon = ({ className, spin }) => (
@@ -108,6 +108,7 @@ export default function AllocationPage() {
 
   // Run state
   const [running, setRunning] = useState(false);
+  const [asyncStatus, setAsyncStatus] = useState(null);
   const [runError, setRunError] = useState(null);
   const [latestRun, setLatestRun] = useState(null);   // the most-recent triggered run
 
@@ -171,26 +172,101 @@ export default function AllocationPage() {
     }
   }, []);
 
-  // ── Trigger allocation run ─────────────────────────────────────────────────
+  // ── Trigger allocation run via RabbitMQ ────────────────────────────────────
   const handleRunAllocation = async () => {
     setRunning(true);
     setRunError(null);
     setLatestRun(null);
+    setAsyncStatus({
+      status: 'ENQUEUING',
+      message: 'Submitting allocation job to Allocation Service via RabbitMQ…',
+    });
+
+    const reqPayload = {
+      strategy: selectedStrategy,
+      runBy: 'admin',
+      notes: runNotes.trim() || null,
+      year: selectedYear === 'ALL' ? null : parseInt(selectedYear, 10),
+    };
+
     try {
-      const res = await fetch(`${ALGORITHM_API_BASE_URL}${API_ENDPOINTS.ALGO_RUN}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          strategy: selectedStrategy,
-          run_by: 'admin',
-          notes: runNotes.trim() || null,
-          year: selectedYear === 'ALL' ? null : parseInt(selectedYear, 10),
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Allocation run failed');
-      setLatestRun(data);
-      await fetchHistory();       // refresh history list
+      // 1. Dispatch async task to Allocation Service via RabbitMQ
+      let triggeredJobId = null;
+      let usedAsync = false;
+
+      try {
+        const res = await fetch(`${ALLOCATION_SERVICE_URL}${API_ENDPOINTS.ALLOCATION_TRIGGER}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(reqPayload),
+        });
+
+        if (res.ok) {
+          const triggerData = await res.json();
+          triggeredJobId = triggerData.jobId;
+          usedAsync = true;
+          setAsyncStatus({
+            jobId: triggeredJobId,
+            status: 'PROCESSING',
+            message: 'Task enqueued in RabbitMQ! Background worker processing allocation…',
+          });
+        }
+      } catch (err) {
+        console.warn('Async trigger via RabbitMQ failed, falling back to direct engine run:', err);
+      }
+
+      if (usedAsync) {
+        // Poll for newly created run created by the background worker
+        let matchedRun = null;
+        let attempts = 0;
+        while (attempts < 20) {
+          await new Promise(r => setTimeout(r, 1000));
+          const runsRes = await fetch(`${ALGORITHM_API_BASE_URL}${API_ENDPOINTS.ALGO_RUNS}`);
+          if (runsRes.ok) {
+            const runs = await runsRes.json();
+            if (runs && runs.length > 0) {
+              const candidate = runs.find(r => r.notes?.includes(triggeredJobId)) || runs[0];
+              if (candidate) {
+                matchedRun = candidate;
+                break;
+              }
+            }
+          }
+          attempts++;
+        }
+
+        if (matchedRun) {
+          const detailRes = await fetch(`${ALGORITHM_API_BASE_URL}${API_ENDPOINTS.ALGO_RUN_BY_ID(matchedRun.id)}`);
+          if (detailRes.ok) {
+            const detail = await detailRes.json();
+            setLatestRun(detail);
+          } else {
+            setLatestRun(matchedRun);
+          }
+        }
+        setAsyncStatus({
+          jobId: triggeredJobId,
+          status: 'COMPLETED',
+          message: 'Allocation completed successfully via RabbitMQ background worker.',
+        });
+      } else {
+        // Direct synchronous fallback
+        const res = await fetch(`${ALGORITHM_API_BASE_URL}${API_ENDPOINTS.ALGO_RUN}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            strategy: selectedStrategy,
+            run_by: 'admin',
+            notes: runNotes.trim() || null,
+            year: selectedYear === 'ALL' ? null : parseInt(selectedYear, 10),
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Allocation run failed');
+        setLatestRun(data);
+      }
+
+      await fetchHistory(); // refresh history list
     } catch (e) {
       setRunError(e.message);
     } finally {
@@ -313,10 +389,16 @@ export default function AllocationPage() {
                   <CogIcon className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-gray-900">Start Allocation Run</h2>
-                  <p className="text-sm text-gray-500 mt-0.5">
-                    The engine fetches all submitted preferences, runs the selected algorithm, and saves a <strong>draft</strong> result for your review.
-                  </p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-lg font-bold text-gray-900">Start Allocation Run</h2>
+                    {/* <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                      RabbitMQ Async Worker Active
+                    </span> */}
+                  </div>
+                  {/* <p className="text-sm text-gray-500 mt-0.5">
+                    Tasks are dispatched via <strong>RabbitMQ</strong> to the background worker and processed asynchronously by the Algorithm Engine.
+                  </p> */}
                 </div>
               </div>
 
@@ -421,8 +503,31 @@ export default function AllocationPage() {
                 style={{ background: 'linear-gradient(135deg, #2d5016, #4a7c2c)' }}
               >
                 {running ? <CogIcon className="w-5 h-5 text-white" spin /> : <PlayIcon className="w-5 h-5" />}
-                {running ? 'Running allocation…' : 'Run Allocation'}
+                {running ? (asyncStatus?.status === 'ENQUEUING' ? 'Enqueuing to RabbitMQ…' : 'Worker Computing…') : 'Run Allocation'}
               </button>
+
+              {/* RabbitMQ Async Status Banner */}
+              {running && asyncStatus && (
+                <div className="mt-4 p-4 rounded-xl bg-emerald-50/80 border border-emerald-200/80 flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-700 flex-shrink-0">
+                    <CogIcon className="w-5 h-5" spin />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold text-emerald-950">
+                        {asyncStatus.status === 'ENQUEUING' ? 'Submitting to RabbitMQ…' : 'RabbitMQ Background Processing'}
+                      </p>
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-200/60 text-emerald-800">
+                        ASYNC
+                      </span>
+                    </div>
+                    <p className="text-xs text-emerald-700 mt-0.5">
+                      {asyncStatus.message}
+                      {asyncStatus.jobId && <span className="font-mono ml-1.5 opacity-75">(Job ID: {asyncStatus.jobId.slice(0, 8)}…)</span>}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Result card — shown after a successful run */}
@@ -441,6 +546,9 @@ export default function AllocationPage() {
                       <span className="text-xs px-2.5 py-0.5 rounded-full border border-blue-200 bg-blue-50 text-blue-700 font-medium">
                         {fmtYear(latestRun.year)}
                       </span>
+                      {/* <span className="text-xs px-2.5 py-0.5 rounded-full border border-purple-200 bg-purple-50 text-purple-700 font-medium flex items-center gap-1">
+                        RabbitMQ Async
+                      </span> */}
                     </div>
                     <p className="text-xs text-gray-500">
                       {fmt(latestRun.created_at)} · Strategy: <strong>{latestRun.strategy}</strong> · Target: <strong>{fmtYear(latestRun.year)}</strong>

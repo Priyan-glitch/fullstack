@@ -21,10 +21,19 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup: ensure DB tables exist."""
+    """Startup: ensure DB tables exist and start RabbitMQ background worker."""
     logger.info("Starting Algorithm Engine — creating DB tables if needed…")
     create_tables()
     logger.info("DB tables ready.")
+
+    # Start RabbitMQ background worker daemon thread
+    try:
+        from app.worker import start_worker_thread
+        logger.info("Starting RabbitMQ background worker…")
+        start_worker_thread()
+    except Exception as e:
+        logger.exception("Failed to start RabbitMQ background worker: %s", e)
+
     yield
     logger.info("Algorithm Engine shutting down.")
 

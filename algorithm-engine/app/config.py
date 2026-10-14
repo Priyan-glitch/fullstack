@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     # Postgres (for storing allocation runs/results)
     database_url: str = "postgresql+psycopg2://postgres:postgres@localhost:5432/algorithm_db"
 
+    # RabbitMQ URL
+    rabbitmq_url: str = "amqp://guest:guest@localhost:5672/"
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
