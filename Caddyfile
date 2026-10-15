@@ -1,0 +1,3 @@
+stableroomie.ssnce.dev {
+    reverse_proxy java-backend:8080
+}

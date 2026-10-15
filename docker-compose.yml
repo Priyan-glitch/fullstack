@@ -1,0 +1,55 @@
+version: '3.8'
+
+# No local PostgreSQL container: the java-backend service connects directly
+# to Neon serverless PostgreSQL. DB_* and GOOGLE_* values are interpolated
+# from the root .env (docker compose auto-loads it from this directory).
+
+services:
+  java-backend:
+    build:
+      context: ./StableRoomie
+      dockerfile: Dockerfile
+    container_name: stableroomie-java
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - DB_URL="${DB_URL}"
+      - DB_USERNAME="${DB_USERNAME}"
+      - DB_PASSWORD="${DB_PASSWORD}"
+      - DB_DRIVER="${DB_DRIVER}"
+      - DB_DIALECT="${DB_DIALECT}"
+      - GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID}"
+      - GOOGLE_CLIENT_SECRET="${GOOGLE_CLIENT_SECRET}"
+      - FLASK_API_URL=http://flask-api:5000
+
+  flask-api:
+    build:
+      context: ./flask-api
+      dockerfile: Dockerfile
+    container_name: stableroomie-flask
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - JAVA_BACKEND_URL=http://java-backend:8080
+    depends_on:
+      - java-backend
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: stableroomie-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - java-backend
+
+volumes:
+  caddy_data:
+  caddy_config:

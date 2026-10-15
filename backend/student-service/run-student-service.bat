@@ -1,3 +1,0 @@
-@echo off
-echo Starting Student Service with UTC timezone...
-mvn spring-boot:run -Dspring-boot.run.jvmArguments="-Duser.timezone=UTC"

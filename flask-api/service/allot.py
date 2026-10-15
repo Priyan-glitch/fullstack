@@ -1,0 +1,190 @@
+import networkx as nx
+import community as community_louvain
+from collections import defaultdict
+
+
+def sleep_hour(time_str):
+    """Convert sleep time string (PM or early AM) to a linear comparable number.
+    e.g. '11:00 PM' -> 23, '12:00 AM' -> 24, '1:00 AM' -> 25, '2:00 AM' -> 26
+    """
+    try:
+        time_str = time_str.strip().upper()
+        parts = time_str.split()
+        hour = int(parts[0].split(":")[0])
+        period = parts[1] if len(parts) > 1 else "PM"
+        if period == "PM" and hour != 12:
+            hour += 12          # 9 PM -> 21, 11 PM -> 23
+        elif period == "PM" and hour == 12:
+            hour = 12           # 12 PM (noon) -> 12
+        elif period == "AM" and hour == 12:
+            hour = 24           # 12 AM (midnight) -> 24
+        else:
+            hour += 24          # 1 AM -> 25, 2 AM -> 26
+        return hour
+    except Exception:
+        return 22               # default to 10 PM
+
+
+def wake_hour(time_str):
+    """Convert wake time string (AM) to hour number.
+    e.g. '7:00 AM' -> 7, '5:00 AM' -> 5
+    """
+    try:
+        time_str = time_str.strip().upper()
+        parts = time_str.split()
+        hour = int(parts[0].split(":")[0])
+        period = parts[1] if len(parts) > 1 else "AM"
+        if period == "PM" and hour != 12:
+            hour += 12
+        elif period == "AM" and hour == 12:
+            hour = 0
+        return hour
+    except Exception:
+        return 7                # default to 7 AM
+
+
+def study_habit_score(habit1, habit2):
+    if habit1 == habit2:
+        return 0.3
+    pair = {habit1, habit2}
+    if pair == {"silent", "music"}:
+        return 0.0
+    elif pair == {"silent", "group"}:
+        return 0.1
+    elif pair == {"music", "group"}:
+        return 0.2
+    return 0.0
+
+
+def get_preferred_ids(student, students):
+    """Return list of studentIds that this student listed as preferred roommates.
+
+    preferredRoommates stores comma-separated digital IDs (student IDs),
+    e.g. "1002, 1003". Non-numeric tokens and IDs not present in the list
+    are ignored.
+    """
+    raw = student.get("preferredRoommates", "") or ""
+    ids = {int(tok) for tok in raw.replace(";", ",").split(",") if tok.strip().isdigit()}
+    return [s["studentId"] for s in students if s["studentId"] in ids]
+
+
+def compatibility(s1, s2, students):
+    score = 0
+    MAX_DIFF = 2
+
+    sleep_diff = abs(sleep_hour(s1["sleepTime"]) - sleep_hour(s2["sleepTime"]))
+    score += max(0, (MAX_DIFF - sleep_diff) / MAX_DIFF) * 0.4
+
+    wake_diff = abs(wake_hour(s1["wakeTime"]) - wake_hour(s2["wakeTime"]))
+    score += max(0, (MAX_DIFF - wake_diff) / MAX_DIFF) * 0.4
+
+    if s1["noiseLevel"] == s2["noiseLevel"]:
+        score += 0.3
+
+    if s1["lightSensitivity"] == s2["lightSensitivity"]:
+        score += 0.3
+
+    if s1["cleanliness"] == s2["cleanliness"]:
+        score += 0.3
+    elif "moderately-clean" in [s1["cleanliness"], s2["cleanliness"]]:
+        score += 0.2
+
+    study1 = s1.get("studyHabits", "")
+    study2 = s2.get("studyHabits", "")
+    if study1 and study2:
+        score += study_habit_score(study1, study2)
+
+    s1_prefs = get_preferred_ids(s1, students)
+    s2_prefs = get_preferred_ids(s2, students)
+    if s2["studentId"] in s1_prefs and s1["studentId"] in s2_prefs:
+        score += 1.0
+    elif s2["studentId"] in s1_prefs or s1["studentId"] in s2_prefs:
+        score += 0.5
+
+    return score
+
+
+def allotment(students, capacity=3):
+    C = capacity
+    groups = []
+    assigned = set()
+    student_map = {s["studentId"]: s for s in students}
+
+    if C == 1:
+        for student in students:
+            groups.append([student["studentId"]])
+        return groups
+
+    # --- Pass 1: Mutual C-way friend preference ---
+    for student in students:
+        if student["studentId"] in assigned:
+            continue
+
+        raw = student.get("preferredRoommates", "") or ""
+        pref_tokens = [tok.strip() for tok in raw.replace(";", ",").split(",") if tok.strip().isdigit()]
+        if len(pref_tokens) < C - 1:
+            continue
+
+        # Resolve preferred digital IDs to unassigned students
+        pref_ids = []
+        for tok in pref_tokens:
+            sid = int(tok)
+            if sid in student_map and sid not in assigned and sid != student["studentId"]:
+                pref_ids.append(sid)
+
+        if len(pref_ids) < C - 1:
+            continue
+
+        # Find combination of size C-1 from pref_ids that mutually prefer each other
+        import itertools
+        for comb in itertools.combinations(pref_ids, C - 1):
+            candidate_group = [student["studentId"]] + list(comb)
+            mutual = True
+            for member_id in candidate_group:
+                member_student = student_map[member_id]
+                member_prefs = get_preferred_ids(member_student, students)
+                others = [m for m in candidate_group if m != member_id]
+                if not all(o in member_prefs for o in others):
+                    mutual = False
+                    break
+            if mutual:
+                groups.append(candidate_group)
+                assigned.update(candidate_group)
+                break
+
+    # --- Pass 2: Louvain community detection on unassigned students ---
+    unassigned = [s for s in students if s["studentId"] not in assigned]
+    G = nx.Graph()
+    for i in range(len(unassigned)):
+        s1 = unassigned[i]
+        G.add_node(s1["studentId"])
+        for j in range(i + 1, len(unassigned)):
+            s2 = unassigned[j]
+            score = compatibility(s1, s2, students)
+            if score > 0:
+                G.add_edge(s1["studentId"], s2["studentId"], weight=score)
+
+    if G.number_of_nodes() > 0:
+        partition = community_louvain.best_partition(G, weight="weight")
+        communities = defaultdict(list)
+        for sid, cid in partition.items():
+            communities[cid].append(sid)
+
+        for cid, members in communities.items():
+            while len(members) >= C:
+                group = members[:C]
+                groups.append(group)
+                assigned.update(group)
+                members = members[C:]
+            # Remaining members go to leftovers
+            for rem in members:
+                if rem in G:
+                    G.remove_node(rem)
+
+    # --- Collect absolute leftovers (fewer than C remaining) ---
+    leftover = [s for s in students if s["studentId"] not in assigned]
+    for i in range(0, len(leftover), C):
+        chunk = leftover[i:i+C]
+        groups.append([sid["studentId"] for sid in chunk])
+
+    return groups
