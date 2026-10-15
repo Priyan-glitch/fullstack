@@ -329,9 +329,10 @@ token stays valid until it expires. Shorten `JWT_EXPIRY_MINUTES` if that matters
 
 ## API gateway & authentication
 
-All frontend API calls go through the gateway (`gateway/Caddyfile`, port 80).
-It verifies a Clerk session token on every `/api/*` request before proxying to a
-service, so the services stop being open endpoints.
+All frontend API calls go through the gateway (`gateway/Caddyfile`; port 80 under
+Docker, 8888 for a native run). It verifies the JWT issued by auth-service on
+every `/api/*` request before proxying to a service, so the services stop being
+open endpoints. It also enforces the `role` claim on administrator-only paths.
 
 ### How a request is authenticated
 
@@ -468,10 +469,10 @@ GET /api/allocations/health
    - Shows dynamic recent activity
    - Loading states and error handling
 
-4. **Clerk Authentication (Frontend)**
+4. **Authentication (Frontend)**
    - Sign-in and sign-up screens at `/login` and `/signup`, themed to the brand
    - Role-aware route guards for every student and admin route
-   - Clerk `<UserButton />` account menu replaces the placeholder header identity
+   - Signed-in identity and a sign-out control in both app shells
    - Student records resolved by email so existing API calls are unchanged
    - 404 page and empty states for the not-yet-built `Requests` routes
 
@@ -481,9 +482,8 @@ GET /api/allocations/health
 2. **Algorithm Engine** - Compatibility scoring and matching logic
 3. **Database Persistence** - Store allocations in database
 4. **Admin Allocation Trigger** - Interface to run allocation
-5. **Backend JWT verification** - Validate Clerk session tokens in the Spring services
-   (the frontend is authenticated today, but the APIs are still open)
-6. **Remove `password` from `StudentDTO`** — the student-service still serialises
-   the password field on `/api/students*`; with Clerk in place it is no longer needed
+5. **Server-side authorization inside the services** — the gateway verifies the JWT
+   and enforces roles, but each service still trusts the `X-Auth-User-Id` header it
+   is handed, so calling a service port directly bypasses the gateway entirely.
 
 ---

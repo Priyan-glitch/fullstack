@@ -1,258 +1,126 @@
-# Stable Roomies - Testing Guide
+# Stable Roomies — Testing Guide
 
-## Prerequisites
+> This file previously described a different, obsolete authentication system: a
+> hardcoded `admin@college.edu` / `admin123` login, `POST /api/students/login`,
+> plaintext passwords in the `students` table, and a plan to "integrate Clerk".
+> **None of that exists any more.** It was rewritten because it documented a
+> removed backdoor credential and would have sent you down the wrong path.
 
-### 1. Start PostgreSQL Database
+## How authentication actually works
+
+Self-hosted JWT. No third-party identity provider.
+
+```
+POST /api/auth/register   {email, password, firstName, lastName}  -> JWT   (always role=student)
+POST /api/auth/login      {email, password}                       -> JWT
+GET  /api/auth/me         Authorization: Bearer <jwt>             -> user
+```
+
+- Passwords are BCrypt-hashed in auth-service's own `users` table.
+- The token is HS256, signed with `JWT_SECRET`, and carries `sub`, `email`,
+  `role` and `name`.
+- The gateway verifies every `/api/*` request except `login` and `register`, and
+  enforces `role` on administrator-only paths.
+- Registration has no `role` field, so nobody can make themselves an admin.
+
+## Credentials
+
+There is exactly **one administrator**, bootstrapped from the gitignored root
+`.env` on first start. Everything else is a student.
+
+| Role | Account | Password |
+|---|---|---|
+| ADMIN | `AUTH_ADMIN_EMAIL` in `.env` | `AUTH_ADMIN_PASSWORD` in `.env` |
+| STUDENT | the 12 seeded `NNNNNNN@ssn.edu.in` accounts | `Student@2026` |
+
+Check the real values:
+
 ```bash
-cd infrastructure/docker
-docker-compose -f docker-compose-dev.yml up -d
+grep -E '^AUTH_ADMIN_EMAIL=|^AUTH_ADMIN_PASSWORD=' .env
 ```
 
-### 2. Insert Sample Data
-Once the database is running, insert test data:
+To change the admin password, edit `.env` and delete the existing admin row —
+the bootstrap only creates an account when none exists, and never modifies one.
+Students change nothing: they are recreated by the seeder.
+
+## Running the stack
 
 ```bash
-docker exec -i stable-roomies-postgres-student psql -U postgres -d student_db < backend/student-service/insert-sample-data.sql
+scripts/dev-native.sh start                  # services, engine, gateway
+cd frontend && npm run dev                   # UI on 5174 (5173 may be taken)
+python3 scripts/seed-simulated-data.py       # 12 students, 2 hostels, 16 rooms
 ```
 
-Or manually:
+Requires a **JDK 21** (`JAVA_HOME`) — building on a newer JDK silently breaks
+Lombok in notification-service — and a local `algorithm_db` (`createdb algorithm_db`).
+
+## Verifying it works
+
 ```bash
-docker exec -it stable-roomies-postgres-student psql -U postgres -d student_db
-# Then paste the INSERT statements from insert-sample-data.sql
+python3 scripts/e2e-test.py
 ```
 
-### 3. Start Backend Service
+48 checks over the gateway: JWT enforcement, both logins, roles, student data,
+hostels and rooms, the allocation engine, RabbitMQ messaging, notifications, and
+authorization (students refused on admin paths, still allowed their own data).
+
+## Logging in by hand
+
 ```bash
-cd backend/student-service
-mvn spring-boot:run
+# warden
+curl -X POST http://localhost:8888/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d "{\"email\":\"$AUTH_ADMIN_EMAIL\",\"password\":\"$AUTH_ADMIN_PASSWORD\"}"
+
+# student
+curl -X POST http://localhost:8888/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"2310893@ssn.edu.in","password":"Student@2026"}'
 ```
 
-Backend will run on: `http://localhost:8081`
+Then use the returned token:
 
-### 4. Start Frontend
 ```bash
-cd frontend
-npm run dev
+curl http://localhost:8888/api/students -H "Authorization: Bearer <token>"
 ```
 
-Frontend will run on: `http://localhost:5173`
+Sending no token, a forged token, or a student token to an admin-only path
+returns 401 or 403 respectively — that is the gateway doing its job, not a bug.
 
----
+## Common issues
 
-## Test Credentials
+| Symptom | Cause |
+|---|---|
+| 401 on everything | `JWT_SECRET` differs between auth-service and the gateway. Both read the root `.env`. |
+| Gateway won't start | `sign_key` is not valid base64. Generate one with `openssl rand -base64 32`. |
+| 502 from the gateway | The target service is not running, or `*_SERVICE_HOST` still points at the Docker service name during a native run. |
+| notification-service won't compile | Maven is on a JDK newer than 21, so Lombok's processor silently stops. Set `JAVA_HOME` to a JDK 21. |
+| "Port 8081 was already in use" | A forked JVM survived a stop. `scripts/dev-native.sh stop` now frees ports too. |
+| Allocation worker logs "No students found" | No students with submitted preferences for the requested year. Omit `year` to allocate all years. |
+| Frontend calls fail with a CORS error | The gateway answers one fixed origin; set `CORS_ALLOW_ORIGIN` to the port Vite actually used. |
 
-### Admin Login
-- **Email**: `admin@college.edu`
-- **Password**: `admin123`
-- **Role**: Select "Admin"
-
-### Student Logins
-
-All students use the same password: **`student123`**
-
-| Name | Email | Role | Profile Status |
-|------|-------|------|----------------|
-| Rahul Kumar | rahul.kumar@college.edu | Student | Complete (100%) |
-| Priya Sharma | priya.sharma@college.edu | Student | Complete (100%) |
-| Arjun Reddy | arjun.reddy@college.edu | Student | Complete (100%) |
-| Ananya Iyer | ananya.iyer@college.edu | Student | Complete (100%) |
-| Vikram Singh | vikram.singh@college.edu | Student | Incomplete (60%) |
-| Sneha Patel | sneha.patel@college.edu | Student | Incomplete (70%) |
-| Aditya Gupta | aditya.gupta@college.edu | Student | Complete (100%) |
-| Meera Krishnan | meera.krishnan@college.edu | Student | Complete (100%) |
-| Rohan Nair | rohan.nair@college.edu | Student | Complete (100%) |
-| Ishita Verma | ishita.verma@college.edu | Student | Complete (100%) |
-
----
-
-## Testing Workflow
-
-### 1. Test Student Login
-1. Go to `http://localhost:5173/login`
-2. Select "Student" role
-3. Enter: `rahul.kumar@college.edu` / `student123`
-4. Click "Sign in as Student"
-5. Should redirect to `/student/dashboard`
-6. Check if user name appears in top right (Rahul Kumar)
-7. Test logout button
-
-### 2. Test Admin Login
-1. Go to `http://localhost:5173/login`
-2. Select "Admin" role
-3. Enter: `admin@college.edu` / `admin123`
-4. Click "Sign in as Admin"
-5. Should redirect to `/admin/dashboard`
-
-### 3. Test Invalid Login
-1. Try wrong password → Should show "Invalid credentials"
-2. Try empty fields → Should show "Please fill in all fields"
-3. Try non-existent email → Should show "Invalid credentials"
-
-### 4. Test API Directly (Postman/cURL)
-
-**Login Request:**
-```bash
-curl -X POST http://localhost:8081/api/students/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "rahul.kumar@college.edu",
-    "password": "student123",
-    "role": "student"
-  }'
-```
-
-**Expected Response:**
-```json
-{
-  "success": true,
-  "message": "Login successful",
-  "role": "student",
-  "student": {
-    "id": 1,
-    "registerNumber": "2024CSE001",
-    "firstName": "Rahul",
-    "lastName": "Kumar",
-    "email": "rahul.kumar@college.edu",
-    "phone": "9876543210",
-    "department": "Computer Science",
-    "year": 1,
-    "semester": 1,
-    "gender": "Male",
-    "profileComplete": true,
-    "profileCompletionPercent": 100,
-    "active": true
-  }
-}
-```
-
-**Get All Students:**
-```bash
-curl http://localhost:8081/api/students
-```
-
-**Get Student by Email:**
-```bash
-curl http://localhost:8081/api/students/email/rahul.kumar@college.edu
-```
-
----
-
-## Features to Test
-
-### Student Dashboard
-- [ ] View allocation status
-- [ ] View profile completion percentage
-- [ ] Navigate to profile page
-- [ ] Navigate to preferences page
-- [ ] Navigate to room allocation page
-- [ ] Logout functionality
-
-### Admin Dashboard
-- [ ] View student statistics
-- [ ] View room distribution
-- [ ] Navigate to students management
-- [ ] Navigate to hostels management
-- [ ] Navigate to rooms management
-- [ ] Navigate to allocation page
-
----
-
-## Common Issues & Solutions
-
-### Issue: "Unable to connect to server"
-**Solution**: Make sure the backend is running on port 8081
-```bash
-curl http://localhost:8081/api/students
-```
-
-### Issue: "Invalid credentials" for correct password
-**Solution**: Check if sample data is inserted
-```bash
-docker exec stable-roomies-postgres-student psql -U postgres -d student_db -c "SELECT email, password FROM students LIMIT 5;"
-```
-
-### Issue: Frontend not loading
-**Solution**: Check if frontend is running
-```bash
-cd frontend
-npm run dev
-```
-
-### Issue: CORS errors
-**Solution**: Backend has CORS enabled with `@CrossOrigin(origins = "*")` - should work automatically
-
-### Issue: Database connection error
-**Solution**: Verify PostgreSQL is running
-```bash
-docker ps | grep postgres-student
-docker logs stable-roomies-postgres-student
-```
-
----
-
-## Database Access
-
-### Connect to PostgreSQL:
-```bash
-docker exec -it stable-roomies-postgres-student psql -U postgres -d student_db
-```
-
-### Useful SQL Commands:
-```sql
--- View all students
-SELECT id, register_number, first_name, last_name, email FROM students;
-
--- Check passwords
-SELECT email, password FROM students;
-
--- Reset a password
-UPDATE students SET password = 'newpass123' WHERE email = 'rahul.kumar@college.edu';
-
--- Delete all students
-DELETE FROM students;
-```
-
----
-
-## Architecture Overview
+## Architecture
 
 ```
-Frontend (React)          Backend (Spring Boot)       Database (PostgreSQL)
-http://localhost:5173 ←→ http://localhost:8081    ←→ localhost:5432
-
-LoginPage.jsx
-  ↓ POST /api/students/login
-StudentController.java
-  ↓ authenticateStudent()
-StudentService.java
-  ↓ findByEmail()
-StudentRepository.java
-  ↓ SQL Query
-student_db.students table
+browser --(Bearer JWT)--> gateway :8888
+                            |-- jwtauth (HS256, shared secret)
+                            |-- role check on admin-only paths
+                            |-- X-Auth-User-Id -> service
+                            |
+      +---------------------+---------------------+
+      |            |              |                 |
+ auth :8085   student :8081  hostel :8082   allocation :8083  notification :8084
+      |            |              |                 |
+   users        students     hostels/rooms     RabbitMQ -> algorithm-engine :8090
+      \____________\_____________/_____________________/
+                          Neon PostgreSQL
 ```
 
----
+## Security notes
 
-## Next Steps
-
-After verifying login works:
-1. Create Student Preferences entity and table
-2. Build preference submission endpoints
-3. Connect preferences page to backend
-4. Implement other microservices (hostel, allocation, notification)
-5. Integrate Clerk authentication (replace current password system)
-
----
-
-## Security Notes
-
-⚠️ **IMPORTANT**: Current implementation is for testing only!
-
-- Passwords are stored in **plaintext** (NOT secure)
-- No password hashing (bcrypt will be added)
-- No JWT tokens (will be added with Clerk)
-- No rate limiting
-- No input validation/sanitization
-- CORS is wide open (`origins = "*"`)
-
-**All of this will be replaced when Clerk is integrated.**
+- `students.password` is deprecated and unmapped: auth-service owns credentials.
+  The column remains only because dropping it is destructive.
+- The services publish their own host ports, so they are reachable directly and
+  therefore bypass the gateway. Treat gateway checks as the application's
+  enforcement point, not the network's.
+- Never commit `.env`; it holds the JWT secret and the warden's password.

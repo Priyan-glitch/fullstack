@@ -43,7 +43,7 @@ public class StudentService {
             return convertToDTO(studentOpt.get());
         }
 
-        // Auto-provision student profile for newly signed-in Clerk user
+        // Auto-provision a student profile for a newly signed-in account
         Student newStudent = new Student();
         newStudent.setEmail(email);
         String prefix = (email != null && email.contains("@"))
