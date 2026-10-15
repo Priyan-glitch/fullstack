@@ -9,7 +9,6 @@ public class StudentDTO {
     private String firstName;
     private String lastName;
     private String email;
-    private String password; // Temporary for testing
     private String phone;
     private String department;
     private Integer year;
@@ -76,14 +75,6 @@ public class StudentDTO {
 
     public void setEmail(String email) {
         this.email = email;
-    }
-
-    public String getPassword() {
-        return password;
-    }
-
-    public void setPassword(String password) {
-        this.password = password;
     }
 
     public String getPhone() {

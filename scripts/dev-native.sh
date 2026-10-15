@@ -208,6 +208,21 @@ stop_all() {
     fi
     rm -f "$pidfile"
   done
+
+  # `mvn spring-boot:run` forks a child JVM, and that JVM does not always die
+  # with the Maven process — it keeps the port, and the next start then fails
+  # with "Port 8081 was already in use". So free the ports explicitly too.
+  for spec in "${COMPONENTS[@]}" "gateway:$GATEWAY_PORT"; do
+    name="${spec%%:*}"; port="${spec##*:}"
+    pid="$(lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null | head -1)"
+    [[ -z "$pid" ]] && continue
+    # Only ours: never kill an unrelated process that happens to hold the port.
+    if ps -p "$pid" -o command= 2>/dev/null | grep -qE "stable-roomies|${name}"; then
+      kill "$pid" 2>/dev/null && printf '  freed %s on port %s (pid %s)\n' "$name" "$port" "$pid"
+    else
+      printf '  ! port %s is held by an unrelated process (pid %s) — left alone\n' "$port" "$pid"
+    fi
+  done
   echo "Done."
 }
 

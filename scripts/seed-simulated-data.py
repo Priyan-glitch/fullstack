@@ -171,27 +171,36 @@ def main() -> int:
 
     # ── Hostels ───────────────────────────────────────────────────────────────
     print("\nHostels and rooms")
+    # Look up what already exists up front. The API does not reject a duplicate
+    # hostel name, so waiting for a conflict error never fired and every re-run
+    # appended another copy of each hostel.
+    _, listed = call(base, "GET", "/api/hostels", token=admin_token)
+    by_name = {h["name"]: h["id"] for h in (listed if isinstance(listed, list) else [])}
+
     hostel_ids: list[int] = []
     for h in HOSTELS:
+        if h["name"] in by_name:
+            hostel_ids.append(by_name[h["name"]])
+            ok(f"{h['name']} already exists (id {by_name[h['name']]})")
+            continue
+
         payload = {**h, "availableCapacity": h["totalCapacity"], "active": True}
         status, body = call(base, "POST", "/api/hostels", token=admin_token, payload=payload)
-        # hostels returns 200 where students returns 201 — see get_hostel in the
-        # report; accept either rather than depending on that inconsistency.
         if status in (200, 201):
             hostel_ids.append(body["id"])
             ok(f"created {h['name']} (id {body['id']})")
-        elif status == 400 and "already exists" in str(body).lower():
-            # Idempotent re-run: find it instead of failing.
-            _, listed = call(base, "GET", "/api/hostels", token=admin_token)
-            match = next((x for x in listed if x["name"] == h["name"]), None)
-            if not match:
-                fail(f"{h['name']} exists but could not be found")
-            hostel_ids.append(match["id"])
-            ok(f"{h['name']} already existed (id {match['id']})")
         else:
             fail(f"creating {h['name']} failed ({status}): {body}")
 
     # ── Rooms ─────────────────────────────────────────────────────────────────
+    # Same reasoning as hostels: room numbers are unique per hostel but the API
+    # will happily create a second one, so skip what is already there.
+    _, listed_rooms = call(base, "GET", "/api/rooms", token=admin_token)
+    existing_rooms = {
+        (r.get("hostelId"), r.get("roomNumber"))
+        for r in (listed_rooms if isinstance(listed_rooms, list) else [])
+    }
+
     rooms_created = 0
     for idx, hostel_id in enumerate(hostel_ids):
         for n in range(len(ROOM_PLAN) * 2):
@@ -208,14 +217,15 @@ def main() -> int:
                 "status": "AVAILABLE",
                 "amenities": "Fan, Desk, Wardrobe, WiFi",
             }
+            if (hostel_id, payload["roomNumber"]) in existing_rooms:
+                continue
+
             status, body = call(base, "POST", "/api/rooms", token=admin_token, payload=payload)
             if status in (200, 201):
                 rooms_created += 1
-            elif status == 400:
-                pass  # already there on a re-run
             else:
                 fail(f"creating room {payload['roomNumber']} failed ({status}): {body}")
-    ok(f"{rooms_created} rooms created (existing ones left alone)")
+    ok(f"{rooms_created} new rooms created (existing ones left alone)")
 
     # ── Students ──────────────────────────────────────────────────────────────
     print("\nSimulated students")
@@ -239,12 +249,16 @@ def main() -> int:
         else:
             fail(f"registering {email} failed ({status}): {body}")
 
-        # 2. Profile in student-service. `password` is still NOT NULL there even
-        #    though auth-service now owns credentials, so send a placeholder —
-        #    it is never checked against anything.
-        status, body = call(base, "POST", "/api/students", token=token, payload={
+        # 2. Profile in student-service.
+        #
+        # This uses the ADMIN token, not the student's. Creating a student record
+        # is an administrative action — `POST /api/students` is the collection
+        # root, which the gateway restricts to role=admin. A student's own token
+        # is correctly refused with 403. Registering the account above is still
+        # done with the public endpoint, since that is self-service.
+        status, body = call(base, "POST", "/api/students", token=admin_token, payload={
             "registerNumber": reg, "firstName": first, "lastName": last,
-            "email": email, "password": "managed-by-auth-service",
+            "email": email,
             "phone": f"98400{reg[2:]}", "department": dept,
             "year": year, "semester": sem, "gender": gender,
             "city": "Chennai", "state": "Tamil Nadu", "pincode": "603110",
@@ -254,8 +268,9 @@ def main() -> int:
         if status == 201:
             student_id = body["id"]
             action = "created"
-        elif status == 400 and "already exists" in str(body).lower():
-            _, found = call(base, "GET", f"/api/students/register-number/{reg}", token=token)
+        elif status in (400, 409) and "already exists" in str(body).lower():
+            _, found = call(base, "GET", f"/api/students/register-number/{reg}",
+                            token=admin_token)
             student_id = found["id"]
             action = "existing"
         else:
@@ -278,12 +293,20 @@ def main() -> int:
             "socialPreference": "MODERATE", "personalSpace": "MODERATE",
             "visitorPreference": "RARELY", "submitted": True,
         })
-        if status not in (200, 201):
+        if status in (200, 201):
+            prefs = "set"
+        elif "already been submitted" in str(body).lower():
+            # Preferences lock after the first submission — correct behaviour, and
+            # it means this student was seeded on an earlier run. Not an error.
+            prefs = "locked"
+        else:
             fail(f"submitting preferences for {email} failed ({status}): {body}")
 
         created.append({"id": student_id, "email": email, "name": f"{first} {last}",
-                        "hostel": HOSTELS[h_idx]["name"], "action": action})
-        print(f"  {'·' if action == 'existing' else '+'} {email:<22} id={student_id:<4} {first} {last}")
+                        "hostel": HOSTELS[h_idx]["name"], "action": action,
+                        "prefs": prefs})
+        print(f"  {'·' if action == 'existing' else '+'} {email:<22} id={student_id:<4} "
+              f"{first} {last}  (prefs {prefs})")
 
     print(f"\n\033[1mSeeded {len(created)} students, {len(hostel_ids)} hostels, "
           f"{rooms_created} new rooms.\033[0m")

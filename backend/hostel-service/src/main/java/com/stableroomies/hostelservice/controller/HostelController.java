@@ -3,6 +3,7 @@ package com.stableroomies.hostelservice.controller;
 import com.stableroomies.hostelservice.model.Hostel;
 import com.stableroomies.hostelservice.service.HostelService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
@@ -28,8 +29,11 @@ public class HostelController {
     }
 
     @PostMapping
-    public Hostel createHostel(@RequestBody Hostel hostel) {
-        return hostelService.createHostel(hostel);
+    public ResponseEntity<Hostel> createHostel(@RequestBody Hostel hostel) {
+        // 201, to match POST /api/students and POST /api/allocations. This
+        // returned a bare 200, which was the only create endpoint not signalling
+        // creation. The UI reads response.ok, so it accepts either.
+        return ResponseEntity.status(HttpStatus.CREATED).body(hostelService.createHostel(hostel));
     }
 
     @PutMapping("/{id}")

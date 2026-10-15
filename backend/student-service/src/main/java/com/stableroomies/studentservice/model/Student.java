@@ -32,17 +32,12 @@ public class Student {
     @Column(nullable = false, unique = true, length = 150)
     private String email;
 
-    /**
-     * Deprecated: credentials are owned by auth-service (BCrypt in its own
-     * `users` table), so this service no longer sets or checks a password.
-     *
-     * It stays nullable rather than being dropped outright because dropping a
-     * column is destructive; the insert path deliberately leaves it null. Note
-     * `nullable = false` here caused every POST /api/students to fail with a
-     * NOT NULL violation, because the mapper never set the field.
-     */
-    @Column(length = 255)
-    private String password;
+    // Removed: `password`. Credentials are owned by auth-service (BCrypt in its
+    // own `users` table); this service never set or checked one. The database
+    // column is left in place because dropping it is destructive, but it is no
+    // longer mapped here. It was previously `nullable = false`, which made every
+    // POST /api/students fail with a NOT NULL violation because the mapper never
+    // populated it.
 
     @Column(length = 20)
     private String phone;
@@ -173,14 +168,6 @@ public class Student {
 
     public void setEmail(String email) {
         this.email = email;
-    }
-
-    public String getPassword() {
-        return password;
-    }
-
-    public void setPassword(String password) {
-        this.password = password;
     }
 
     public String getPhone() {

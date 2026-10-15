@@ -158,19 +158,56 @@ that Vite silently picks the next free port if 5173 is busy.
 
 ---
 
-## Observations not fixed
+## Fixed in a follow-up pass
 
-- **`POST /api/hostels` returns 200, not 201**, while `POST /api/students` returns
-  201 and `POST /api/allocations` returns 202. Harmless, but inconsistent; the UI
-  and the seeder tolerate both.
-- **Dead authentication code.** `POST /api/students/login` is unreachable behind
-  the gateway, and `students.password` is now unused. Both are safe to delete.
+- **`POST /api/students/login` was a hardcoded-credential backdoor.** It returned
+  administrator access for three literal values — role `admin`, `admin@college.edu`,
+  `admin123` — with no token check in front of it, and it compared student
+  passwords in plaintext. Calling it directly on `:8081` with no token returned
+  `{"success":true,"message":"Admin login successful","role":"admin"}`. The
+  response carries no JWT, so it was not a working privilege escalation under the
+  current token auth, but it should never have existed. The endpoint, its DTOs,
+  and `StudentService.authenticateStudent` are gone; so is the unused
+  `password` field on the `Student` entity and `StudentDTO`.
+- **`POST /api/hostels` returned 200** while every other create endpoint returned
+  201. Now 201. `POST /api/rooms` likewise.
+- **A missing `availableCapacity` on hostel creation returned 500**
+  (`not-null property references a null or transient value`). A new hostel now
+  derives it from `totalCapacity`.
+- **The seeder created duplicate hostels on every run.** It waited for a
+  conflict error the API never returns, because hostel names are not unique. It
+  now looks up existing hostels and rooms first and creates only what is
+  missing; two consecutive runs add nothing. It also creates student *profiles*
+  with the admin token, since that is an administrative action the gateway
+  correctly restricts.
+
+## Observations still open
+
 - **Backend services still publish their own host ports**, so they remain
-  callable directly without a token. The gateway is a chokepoint, not a wall;
-  removing the `ports:` mappings would make it the only way in.
+  callable directly without a token — which is how the backdoor above was
+  reachable. The gateway is a chokepoint, not a wall. Making the services the
+  only enforcement point would need server-side token validation in each; short
+  of that, removing the `ports:` mappings hardens the Docker deployment but not a
+  native run, where the services must bind locally for the gateway to reach them.
 - **The `X-Auth-User-Id` header is advisory.** The gateway overwrites it, so it
   can't be spoofed through the gateway — but a direct call to a service port can
   still set it freely.
+- **Preferences lock after submission**, so a student cannot revise them. That is
+  deliberate behaviour; noting it because the seeder has to treat the resulting
+  403 as success rather than an error.
+
+## Accounts
+
+Exactly one administrator exists, and every other account is a student:
+
+| Role | Count |
+|---|---|
+| ADMIN | 1 |
+| STUDENT | 12 |
+
+Credentials are in the gitignored root `.env` (`AUTH_ADMIN_EMAIL` /
+`AUTH_ADMIN_PASSWORD`); the password is stored BCrypt-hashed. All 12 simulated
+students share the password `Student@2026`.
 
 ## Limitations
 

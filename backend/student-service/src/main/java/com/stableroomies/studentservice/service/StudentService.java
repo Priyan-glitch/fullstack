@@ -60,7 +60,6 @@ public class StudentService {
             regNum = "2024REG" + String.format("%04d", (int)(Math.random() * 9000 + 1000));
         }
         newStudent.setRegisterNumber(regNum);
-        newStudent.setPassword("clerk_authenticated");
         newStudent.setDepartment(Department.COMPUTER_SCIENCE);
         newStudent.setYear(1);
         newStudent.setSemester(1);
@@ -254,18 +253,9 @@ public class StudentService {
         return (completedFields * 100) / totalFields;
     }
 
-    // Simple login for testing - will be replaced by Clerk authentication
-    public Student authenticateStudent(String email, String password) {
-        Optional<Student> studentOpt = studentRepository.findByEmail(email);
-        if (studentOpt.isPresent()) {
-            Student student = studentOpt.get();
-            // Simple plaintext password check for testing only
-            if (password.equals(student.getPassword())) {
-                return student;
-            }
-        }
-        return null;
-    }
+    // Removed: authenticateStudent. It compared passwords in plaintext against
+    // students.password, and its only caller was the deleted POST /login.
+    // auth-service owns credential verification (BCrypt).
 
     // Admin Dashboard Statistics
     public AdminDashboardStats getDashboardStats() {

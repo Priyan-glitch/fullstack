@@ -1,8 +1,6 @@
 package com.stableroomies.studentservice.controller;
 
 import com.stableroomies.studentservice.dto.AdminDashboardStats;
-import com.stableroomies.studentservice.dto.LoginRequest;
-import com.stableroomies.studentservice.dto.LoginResponse;
 import com.stableroomies.studentservice.dto.StudentDTO;
 import com.stableroomies.studentservice.model.Department;
 import com.stableroomies.studentservice.model.Student;
@@ -98,30 +96,13 @@ public class StudentController {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
     }
 
-    // Simple login endpoint for testing - will be replaced by Clerk authentication
-    @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
-        // Hardcoded admin check (temporary - will be replaced by Clerk)
-        if ("admin".equalsIgnoreCase(request.getRole()) && 
-            "admin@college.edu".equals(request.getEmail()) && 
-            "admin123".equals(request.getPassword())) {
-            LoginResponse response = new LoginResponse(true, "Admin login successful", "admin", null);
-            return ResponseEntity.ok(response);
-        }
-
-        // Student authentication
-        if ("student".equalsIgnoreCase(request.getRole())) {
-            Student student = studentService.authenticateStudent(request.getEmail(), request.getPassword());
-            if (student != null) {
-                StudentDTO dto = studentService.convertToDTO(student);
-                LoginResponse response = new LoginResponse(true, "Login successful", "student", dto);
-                return ResponseEntity.ok(response);
-            }
-        }
-
-        LoginResponse response = new LoginResponse(false, "Invalid credentials");
-        return ResponseEntity.status(401).body(response);
-    }
+    // Removed: POST /login.
+    //
+    // It returned administrator access for three hardcoded values — role
+    // "admin", admin@college.edu, admin123 — with no token check in front of it.
+    // It was reachable unauthenticated on the service port, bypassing the
+    // gateway entirely, and it compared student passwords in plaintext. Nothing
+    // in the frontend ever called it. Authentication is auth-service's job.
 
     // Admin Dashboard Statistics
     @GetMapping("/admin/stats")

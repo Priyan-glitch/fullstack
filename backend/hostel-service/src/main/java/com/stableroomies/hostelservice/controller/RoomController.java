@@ -4,6 +4,7 @@ import com.stableroomies.hostelservice.dto.RoomInventoryDTO;
 import com.stableroomies.hostelservice.model.Room;
 import com.stableroomies.hostelservice.service.RoomService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
@@ -34,8 +35,9 @@ public class RoomController {
     }
 
     @PostMapping
-    public Room createRoom(@RequestBody Room room) {
-        return roomService.createRoom(room);
+    public ResponseEntity<Room> createRoom(@RequestBody Room room) {
+        // 201, matching every other create endpoint (see HostelController).
+        return ResponseEntity.status(HttpStatus.CREATED).body(roomService.createRoom(room));
     }
 
     @PutMapping("/{id}")

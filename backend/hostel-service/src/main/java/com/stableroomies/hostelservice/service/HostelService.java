@@ -22,6 +22,13 @@ public class HostelService {
     }
 
     public Hostel createHostel(Hostel hostel) {
+        // availableCapacity is NOT NULL. Jackson builds the object through the
+        // no-arg constructor and setters, so it arrives null unless the client
+        // sends it — which surfaced as a 500 DataIntegrityViolationException.
+        // A newly created hostel has all of its capacity free, so derive it.
+        if (hostel.getAvailableCapacity() == null) {
+            hostel.setAvailableCapacity(hostel.getTotalCapacity());
+        }
         return hostelRepository.save(hostel);
     }
 
