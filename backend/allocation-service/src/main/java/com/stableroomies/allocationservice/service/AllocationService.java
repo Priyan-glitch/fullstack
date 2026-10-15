@@ -34,7 +34,10 @@ public class AllocationService {
     public AllocationTriggerResponse triggerAllocationAsync(AllocationTriggerRequest request) {
         String jobId = UUID.randomUUID().toString();
         String strategy = request.getStrategy() != null ? request.getStrategy() : "graph_clustering";
-        Integer year = request.getYear() != null ? request.getYear() : 4;
+        // Passed through as-is: a null year means "every year" to the algorithm
+        // engine. Coercing null to 4 here restricted allocation to year-4
+        // students and made the UI's "All years" option a no-op.
+        Integer year = request.getYear();
         String runBy = request.getRunBy() != null ? request.getRunBy() : "admin";
         String notes = request.getNotes();
 

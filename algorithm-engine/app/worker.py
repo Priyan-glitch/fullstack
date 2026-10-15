@@ -36,7 +36,9 @@ def process_allocation_message(ch, method, properties, body):
         data = json.loads(body.decode("utf-8"))
         job_id = data.get("jobId")
         strategy = data.get("strategy", "graph_clustering")
-        year = data.get("year", 4)
+        # No default: a missing/null year means every year. Defaulting to 4 here
+        # silently skipped students in years 1-3.
+        year = data.get("year")
         run_by = data.get("runBy", "admin")
         notes = data.get("notes") or f"Triggered asynchronously via RabbitMQ (jobId={job_id})"
 

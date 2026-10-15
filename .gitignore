@@ -78,3 +78,6 @@ desktop.ini
 # These encode one developer's own port mappings, so they must never be shared.
 # See the Infrastructure section of the README for the 5432 conflict workaround.
 docker-compose.override.yml
+
+# Service logs and pid files written by scripts/dev-native.sh
+logs/

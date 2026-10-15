@@ -68,6 +68,41 @@ stable-roomies/
 
 ## Running Locally
 
+### Quick Start — no Docker
+
+Runs the entire stack on the host: all five services, the algorithm engine, the
+gateway, and RabbitMQ/Postgres if you already have a local Postgres.
+
+```bash
+scripts/dev-native.sh start          # start everything and wait for readiness
+scripts/dev-native.sh status         # what's up
+scripts/dev-native.sh logs auth-service
+scripts/dev-native.sh stop
+```
+
+Then, in another terminal:
+
+```bash
+cd frontend && npm run dev
+python3 scripts/seed-simulated-data.py   # optional: 12 students, 2 hostels, 16 rooms
+python3 scripts/e2e-test.py              # 48 end-to-end checks
+```
+
+Two prerequisites the script enforces because both fail confusingly otherwise:
+
+- **A JDK 21.** Maven must *run* on 21, not merely target it. On a newer JDK
+  (Homebrew's Maven picks up JDK 26), Lombok's annotation processor silently stops
+  running and notification-service fails to compile with `cannot find symbol` for
+  every generated getter. Set `JAVA_HOME`, or let the script find a JDK 21.
+- **A local `algorithm_db`** — `createdb algorithm_db`. The engine keeps its
+  allocation runs there, separate from the Spring services.
+
+The gateway listens on **8888** rather than 80 (binding below 1024 needs root),
+and `frontend/.env.local` points `VITE_GATEWAY_BASE_URL` at it.
+
+See [E2E_REPORT.md](E2E_REPORT.md) for the verification results and the defects
+this path surfaced.
+
 ### Quick Start - All Backend Services
 
 Use the convenience script to start all backend services at once:

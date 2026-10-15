@@ -32,8 +32,17 @@ public class Student {
     @Column(nullable = false, unique = true, length = 150)
     private String email;
 
-    @Column(nullable = false, length = 255)
-    private String password; // Temporary for testing, will be removed when Clerk is integrated
+    /**
+     * Deprecated: credentials are owned by auth-service (BCrypt in its own
+     * `users` table), so this service no longer sets or checks a password.
+     *
+     * It stays nullable rather than being dropped outright because dropping a
+     * column is destructive; the insert path deliberately leaves it null. Note
+     * `nullable = false` here caused every POST /api/students to fail with a
+     * NOT NULL violation, because the mapper never set the field.
+     */
+    @Column(length = 255)
+    private String password;
 
     @Column(length = 20)
     private String phone;

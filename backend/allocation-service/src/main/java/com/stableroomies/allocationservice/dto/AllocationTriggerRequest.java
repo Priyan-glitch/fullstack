@@ -2,7 +2,16 @@ package com.stableroomies.allocationservice.dto;
 
 public class AllocationTriggerRequest {
     private String strategy = "graph_clustering";
-    private Integer year = 4;
+
+    /**
+     * Academic year to allocate, or null for every year.
+     *
+     * This used to default to 4, which silently restricted allocation to year-4
+     * students. The admin UI's "All years" option sends an explicit null, and
+     * that null was then coerced to 4 here, so the option never did what it said.
+     */
+    private Integer year;
+
     private String runBy = "admin";
     private String notes;
 
