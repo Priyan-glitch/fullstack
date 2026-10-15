@@ -95,6 +95,18 @@
 		route @api {
 
 			# Set before jwtauth so the browser can still read a 401 body.
+			#
+			# The gateway is the SINGLE CORS authority for /api/*. The services
+			# must not set CORS headers: this directive writes a value before the
+			# proxy runs, and the proxy then merges the upstream response headers
+			# in, so an upstream `Access-Control-Allow-Origin: *` (from a stray
+			# @CrossOrigin) produces two values in one response —
+			#   Access-Control-Allow-Origin: http://localhost:5174
+			#   Access-Control-Allow-Origin: *
+			# — which browsers reject outright. Every request then fails with
+			# "blocked by CORS policy", the UI reports the backend as unreachable,
+			# and preflights still look healthy because Caddy answers OPTIONS
+			# itself without ever contacting a service.
 			header {
 				Access-Control-Allow-Origin "{$CORS_ALLOW_ORIGIN:http://localhost:5173}"
 				Vary Origin

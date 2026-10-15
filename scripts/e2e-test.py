@@ -17,10 +17,12 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import http.client
 import json
 import pathlib
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -69,6 +71,28 @@ def request(base: str, method: str, path: str, token: str | None = None,
         return status, (json.loads(raw) if raw else None), headers
     except json.JSONDecodeError:
         return status, raw, headers
+
+
+def cors_origins(base: str, path: str, token: str | None = None) -> list[str]:
+    """Every Access-Control-Allow-Origin value on a real (proxied) response.
+
+    This cannot use request() above, because that collapses the headers into a
+    dict and a *duplicate* origin is exactly the failure being checked for.
+    Browsers reject a response carrying two values even when one is correct, so
+    the count matters, not just presence.
+    """
+    parsed = urllib.parse.urlparse(base)
+    conn = http.client.HTTPConnection(parsed.hostname, parsed.port or 80, timeout=30)
+    headers = {"Origin": "http://localhost:5174"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    try:
+        conn.request("GET", path, headers=headers)
+        resp = conn.getresponse()
+        resp.read()
+        return list(resp.headers.get_all("Access-Control-Allow-Origin") or [])
+    finally:
+        conn.close()
 
 
 def read_env() -> dict[str, str]:
@@ -303,6 +327,27 @@ def main() -> int:
         if admin_token:
             status, _, _ = request(base, "GET", "/api/students", token=admin_token)
             check("admin is still allowed on admin paths", status == 200, f"got {status}")
+
+    # ── I. CORS ───────────────────────────────────────────────────────────────
+    # Regression guard. The gateway writes one origin and the proxy then merges
+    # the service's response headers in, so a service that sets its own CORS
+    # (e.g. @CrossOrigin(origins = "*")) yields TWO values in one response. The
+    # browser rejects it, every request fails, and the UI reports the backend as
+    # unreachable — while preflights still look fine, because Caddy answers
+    # OPTIONS itself without ever contacting a service. That is precisely how
+    # this shipped unnoticed, so the count is asserted on real GETs.
+    section("I. CORS (single origin on real requests)")
+    for path in [
+        "/api/students/admin/stats",
+        "/api/notifications/admin",
+        "/api/students",
+        "/api/hostels",
+        "/api/v1/allocation/strategies",
+    ]:
+        values = cors_origins(base, path, admin_token)
+        check(f"{path} carries exactly one CORS origin",
+              len(values) == 1,
+              f"got {len(values)}: {values}")
 
     # ── Summary ───────────────────────────────────────────────────────────────
     passed = sum(1 for _, ok, _ in results if ok)

@@ -26,7 +26,9 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/notifications")
-@CrossOrigin(origins = "*")
+// No @CrossOrigin here on purpose: the gateway is the single CORS authority for
+// /api/*. A second Access-Control-Allow-Origin from this service makes the
+// response carry two values, which browsers reject outright.
 public class NotificationController {
 
     @Autowired

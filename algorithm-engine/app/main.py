@@ -6,7 +6,6 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import create_tables
 from app.routers import allocation
@@ -51,13 +50,14 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# Allow calls from the frontend and admin dashboard during development
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# No CORSMiddleware here on purpose. The gateway is the single CORS authority for
+# /api/*, and it writes Access-Control-Allow-Origin before proxying; the upstream
+# response headers are then merged in. A second value from this engine makes the
+# response carry
+#   Access-Control-Allow-Origin: http://localhost:5174
+#   Access-Control-Allow-Origin: *
+# and browsers reject a multi-valued origin outright, failing every request that
+# touches the engine. Nothing else calls this service from a browser.
 
 # ── Routers ────────────────────────────────────────────────────────────────────
 app.include_router(allocation.router)
