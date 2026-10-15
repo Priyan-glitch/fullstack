@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" role="img" aria-label="StableRoomie technology stack diagram">
+  <title>StableRoomie — Tech Stack</title>
+
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1B1729"/>
+      <stop offset="100%" stop-color="#120F1C"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#6366F1"/>
+      <stop offset="100%" stop-color="#8B5CF6"/>
+    </linearGradient>
+    <style>
+      .layer { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 25px; font-weight: 700; fill: #F2F0F7; letter-spacing: 2.2px; }
+      .tech  { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 23px; font-weight: 400; fill: #B9B2CE; letter-spacing: 0.3px; }
+      .head  { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 58px; font-weight: 700; fill: #F2F0F7; letter-spacing: 0.5px; }
+      .card  { fill: #221E36; stroke: #35304F; stroke-width: 1.5; }
+      .edge  { stroke: #3A3459; stroke-width: 1.5; stroke-linecap: round; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1000" fill="url(#bg)"/>
+
+  <text class="head" x="800" y="250" text-anchor="middle" dominant-baseline="middle">StableRoomie — Tech Stack</text>
+
+  <!-- Layer cards: 6 cards, each 88 tall with an 18 gap, starting at y=340 -->
+  <g>
+    <!-- 1 Client -->
+    <rect class="card" x="90" y="340" width="940" height="88" rx="12"/>
+    <rect x="90" y="340" width="7" height="88" rx="3.5" fill="url(#accent)"/>
+    <text class="layer" x="130" y="384" dominant-baseline="middle">CLIENT</text>
+    <text class="tech" x="470" y="384" dominant-baseline="middle">HTML, CSS, JavaScript</text>
+
+    <!-- 2 Views -->
+    <rect class="card" x="90" y="446" width="940" height="88" rx="12"/>
+    <rect x="90" y="446" width="7" height="88" rx="3.5" fill="url(#accent)"/>
+    <text class="layer" x="130" y="490" dominant-baseline="middle">VIEWS</text>
+    <text class="tech" x="470" y="490" dominant-baseline="middle">Thymeleaf</text>
+
+    <!-- 3 Auth -->
+    <rect class="card" x="90" y="552" width="940" height="88" rx="12"/>
+    <rect x="90" y="552" width="7" height="88" rx="3.5" fill="url(#accent)"/>
+    <text class="layer" x="130" y="596" dominant-baseline="middle">AUTH</text>
+    <text class="tech" x="470" y="596" dominant-baseline="middle">Google OAuth 2.0</text>
+
+    <!-- 4 Backend -->
+    <rect class="card" x="90" y="658" width="940" height="88" rx="12"/>
+    <rect x="90" y="658" width="7" height="88" rx="3.5" fill="url(#accent)"/>
+    <text class="layer" x="130" y="702" dominant-baseline="middle">BACKEND</text>
+    <text class="tech" x="470" y="702" dominant-baseline="middle">Java 17, Spring Boot</text>
+
+    <!-- 5 Matching service -->
+    <rect class="card" x="90" y="764" width="940" height="88" rx="12"/>
+    <rect x="90" y="764" width="7" height="88" rx="3.5" fill="url(#accent)"/>
+    <text class="layer" x="130" y="808" dominant-baseline="middle">MATCHING SERVICE</text>
+    <text class="tech" x="600" y="808" dominant-baseline="middle">Flask, NetworkX, Louvain</text>
+
+    <!-- 6 Database -->
+    <rect class="card" x="90" y="870" width="940" height="88" rx="12"/>
+    <rect x="90" y="870" width="7" height="88" rx="3.5" fill="url(#accent)"/>
+    <text class="layer" x="130" y="914" dominant-baseline="middle">DATABASE</text>
+    <text class="tech" x="470" y="914" dominant-baseline="middle">PostgreSQL on Neon</text>
+  </g>
+
+  <!-- Deployment rail, same top and bottom as the card stack -->
+  <g>
+    <rect class="card" x="1130" y="340" width="250" height="618" rx="12"/>
+    <rect x="1130" y="340" width="7" height="618" rx="3.5" fill="url(#accent)"/>
+    <text class="tech" x="1255" y="494" text-anchor="middle" dominant-baseline="middle">Docker</text>
+    <text class="tech" x="1255" y="649" text-anchor="middle" dominant-baseline="middle">Caddy</text>
+    <text class="tech" x="1255" y="804" text-anchor="middle" dominant-baseline="middle">Azure</text>
+  </g>
+
+  <!-- Connector from the bottom of the stack to the rail -->
+  <line class="edge" x1="1030" y1="914" x2="1130" y2="914"/>
+  <circle cx="1030" cy="914" r="5" fill="#3A3459"/>
+  <circle cx="1130" cy="914" r="5" fill="#3A3459"/>
+</svg>

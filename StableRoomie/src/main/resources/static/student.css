@@ -1,0 +1,61 @@
+/* ============================================
+   StableRoomie — Student screen styles
+   Loaded after styles.css on the student dashboard only.
+   ============================================ */
+
+/* ── Forms ─────────────────────────────────── */
+.preferences-form {
+  max-width: 700px;
+  margin: 0 auto;
+  padding: var(--space-xl);
+}
+
+.preferences-form .card-header {
+  margin-bottom: var(--space-xl);
+}
+
+.preferences-form .card-header h2 {
+  font-size: var(--text-2xl);
+  font-family: var(--font-sans);
+  margin-bottom: var(--space-xs);
+}
+
+.preferences-form .card-header p {
+  color: var(--color-text-muted);
+  margin-bottom: 0;
+}
+
+.locked-banner {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  border: 1px solid #f59e0b;
+  color: #78350f;
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  font-size: 0.95rem;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15);
+}
+
+/* ── Responsive: Mobile (≤ 768px) ──────────── */
+@media (max-width: 768px) {
+  .preferences-form {
+    padding: var(--space-lg);
+    max-width: 100%;
+  }
+}
+
+/* ── Responsive: Small phones (≤ 480px) ────── */
+@media (max-width: 480px) {
+  .preferences-form {
+    padding: var(--space-md);
+  }
+}
+
+/* ── Velvet Dark Theme — student components ── */
+/* Locked banner — dark amber */
+.locked-banner {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.16), rgba(251, 146, 60, 0.12));
+  border-color: rgba(251, 191, 36, 0.4);
+  color: #fcd34d;
+}
+
