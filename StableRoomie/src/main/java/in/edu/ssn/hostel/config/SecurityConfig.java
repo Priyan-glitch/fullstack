@@ -26,8 +26,9 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable()) // Disable CSRF for OAuth2
                 .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/", "/login", "/api/user-info", "/error", "/favicon.ico",
-                        "/styles.css", "/scripts/**", "/src/**").permitAll()
+                .requestMatchers("/", "/login", "/admin/dashboard", "/api/user-info", "/error", "/favicon.ico",
+                        "/styles.css", "/scripts/**", "/src/**", "/api/admin/**", "/get-rooms",
+                        "/update-room/**", "/remove-room/**", "/room-details").permitAll()
                 .anyRequest().authenticated()
                 )
                 // API calls answer with 401 JSON instead of a 302 to the login page.

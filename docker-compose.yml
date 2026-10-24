@@ -1,10 +1,16 @@
-version: '3.8'
-
-# No local PostgreSQL container: the java-backend service connects directly
+# RabbitMQ is local; the java-backend service connects directly
 # to Neon serverless PostgreSQL. DB_* and GOOGLE_* values are interpolated
 # from the root .env (docker compose auto-loads it from this directory).
 
 services:
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: stableroomie-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
   java-backend:
     build:
       context: ./StableRoomie
@@ -14,14 +20,20 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - DB_URL="${DB_URL}"
-      - DB_USERNAME="${DB_USERNAME}"
-      - DB_PASSWORD="${DB_PASSWORD}"
-      - DB_DRIVER="${DB_DRIVER}"
-      - DB_DIALECT="${DB_DIALECT}"
-      - GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID}"
-      - GOOGLE_CLIENT_SECRET="${GOOGLE_CLIENT_SECRET}"
-      - FLASK_API_URL=http://flask-api:5000
+      SPRING_DATASOURCE_URL: "${SPRING_DATASOURCE_URL}"
+      SPRING_DATASOURCE_USERNAME: "${SPRING_DATASOURCE_USERNAME}"
+      SPRING_DATASOURCE_PASSWORD: "${SPRING_DATASOURCE_PASSWORD}"
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: "${DB_DRIVER}"
+      SPRING_JPA_DATABASE_PLATFORM: "${DB_DIALECT}"
+      SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID}"
+      SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET}"
+      ADMIN_EMAIL: "${ADMIN_EMAIL:-}"
+      APP_ADMIN_EMAIL: "${ADMIN_EMAIL:-}"
+      FLASK_API_URL: http://flask-api:5000
+      APP_MESSAGING_ENABLED: "true"
+      SPRING_RABBITMQ_HOST: rabbitmq
+    depends_on:
+      - rabbitmq
 
   flask-api:
     build:
@@ -41,10 +53,10 @@ services:
     container_name: stableroomie-caddy
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
+      # Windows commonly reserves port 80; use these local development ports.
+      - "8081:80"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
+      - ./Caddyfile.local:/etc/caddy/Caddyfile
       - caddy_data:/data
       - caddy_config:/config
     depends_on:

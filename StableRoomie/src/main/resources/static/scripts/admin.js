@@ -903,9 +903,6 @@ function downloadPDF() {
 /* ------------------------------------------------------------------ */
 
 document.addEventListener("DOMContentLoaded", async function () {
-  const sessionOk = await ensureSession("ADMIN");
-  if (!sessionOk) return;
-
   registerSectionLoader("admin-overview", () => {
     loadAllotmentStats();
     loadAllotmentResults();

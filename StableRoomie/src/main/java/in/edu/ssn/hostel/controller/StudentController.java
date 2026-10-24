@@ -21,6 +21,7 @@ import in.edu.ssn.hostel.repo.allotmentRepo;
 import in.edu.ssn.hostel.repo.groupsRepo;
 import in.edu.ssn.hostel.repo.roomRepo;
 import in.edu.ssn.hostel.service.AllotmentService;
+import in.edu.ssn.hostel.service.PreferenceSubmissionService;
 import in.edu.ssn.hostel.service.studentService;
 
 @CrossOrigin
@@ -43,6 +44,9 @@ public class StudentController {
     private AllotmentService allotmentService;
 
     @Autowired
+    private PreferenceSubmissionService preferenceSubmissionService;
+
+    @Autowired
     private in.edu.ssn.hostel.service.SettingsService settingsService;
 
     @PostMapping("/saveStudents")
@@ -57,8 +61,10 @@ public class StudentController {
                     "message", "Preference selection has not been opened yet by the warden. Please check back later."));
         }
 
-        Student savedStudent = students.addStudent(stud);
-        return ResponseEntity.ok(savedStudent);
+        preferenceSubmissionService.submit(stud);
+        return ResponseEntity.accepted().body(Map.of(
+                "message", "Preferences submitted for processing.",
+                "studentId", stud.getStudentId()));
     }
 
     @GetMapping("/api/student/profile")

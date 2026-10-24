@@ -2,9 +2,8 @@
 /* Student preference submission                                       */
 /* ------------------------------------------------------------------ */
 
-document
-  .querySelector(".js-submitIt")
-  .addEventListener("click", async (event) => {
+const studentSubmitButton = document.querySelector(".js-submitIt");
+if (studentSubmitButton) studentSubmitButton.addEventListener("click", async (event) => {
     event.preventDefault();
     const name = document.querySelector(".js-name").value;
     const clg = document.querySelector(".js-clg").value;
@@ -84,7 +83,10 @@ document
 
       const result = await response.json();
       console.log("Success:", result);
-      showToast("Preferences saved successfully!", "success");
+      showToast("Preferences submitted and are being processed.", "success");
+      // The consumer persists the message asynchronously; give it a moment before
+      // refreshing the profile shown by the student overview.
+      await new Promise((resolve) => setTimeout(resolve, 500));
       await loadStudentProfile();
       switchSection("student-overview", document.getElementById("link-student-overview"));
     } catch (error) {
@@ -335,9 +337,34 @@ function toggleMobileSidebar() {
 }
 
 document.addEventListener("DOMContentLoaded", function () {
-  showRooms();
-  checkUserRoleAndShowDashboard();
-  sendRoomAndHostel();
+  const isStudentPage = Boolean(document.querySelector(".js-room-pref1"));
+  const isAdminPage = Boolean(document.getElementById("room-type-list") || document.querySelector(".js-add-button"));
+
+  // Load room types directly for the student form. This keeps the form
+  // independent of the admin dashboard/session initialization.
+  if (isStudentPage) {
+    fetch("/get-rooms", { credentials: "include" })
+      .then((response) => {
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+      })
+      .then(renderRoomTypeOptions)
+      .catch((error) => {
+        console.error("Error loading student room types:", error);
+        renderRoomTypeOptions([]);
+      });
+  }
+
+  if (isAdminPage) {
+    showRooms();
+    sendRoomAndHostel();
+  }
+
+  // The shared dashboard page needs role-based initialization; the dedicated
+  // student/admin templates do not.
+  if (document.getElementById("landing-page") || document.getElementById("app-container")) {
+    checkUserRoleAndShowDashboard();
+  }
 });
 
 /* ------------------------------------------------------------------ */
